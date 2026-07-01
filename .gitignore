@@ -35,3 +35,6 @@ Desktop.ini
 
 # Throwaway fixtures/output from manual script verification
 .tmp-import-test/
+
+# Legacy auto-skill backup folder (ignored from Git upload)
+legacy-autoskill-backup/

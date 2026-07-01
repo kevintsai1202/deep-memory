@@ -17,7 +17,12 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 def main():
     parser = argparse.ArgumentParser(description="Export ChromaDB to JSONL backup")
-    parser.add_argument("--workspace", type=str, default=os.getcwd(), help="Workspace root path")
+    # 優先從環境變數 DEEP_MEMORY_WORKSPACE 取得工作目錄，否則預設為使用者家目錄下的 .deep-memory
+    default_ws = os.environ.get("DEEP_MEMORY_WORKSPACE")
+    if not default_ws:
+        default_ws = os.path.join(os.path.expanduser("~"), ".deep-memory")
+
+    parser.add_argument("--workspace", type=str, default=default_ws, help="Workspace root path")
     parser.add_argument("--output", type=str, default="backup/chroma_export.jsonl", help="Output JSONL file path")
     args = parser.parse_args()
 

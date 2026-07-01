@@ -81,7 +81,12 @@ def copy_knowledge_to_backup(base_dir: str, backup_dir: str):
 
 def main():
     parser = argparse.ArgumentParser(description="Backup knowledge base to GitHub")
-    parser.add_argument("--workspace", type=str, default=os.getcwd(), help="Workspace root path")
+    # 優先從環境變數 DEEP_MEMORY_WORKSPACE 取得工作目錄，否則預設為使用者家目錄下的 .deep-memory
+    default_ws = os.environ.get("DEEP_MEMORY_WORKSPACE")
+    if not default_ws:
+        default_ws = os.path.join(os.path.expanduser("~"), ".deep-memory")
+
+    parser.add_argument("--workspace", type=str, default=default_ws, help="Workspace root path")
     # 固定預設 repo 名稱：多數使用者永遠不用打 --repo，天然避免跨裝置/跨時間打錯字造成備份分裂成兩個倉庫；
     # 仍保留覆蓋能力給真的需要自訂名稱的情境
     parser.add_argument("--repo", type=str, default="deep-memory-knowledge", help="GitHub repo name (default: deep-memory-knowledge)")
@@ -97,7 +102,12 @@ def main():
     # 取得技能目錄（此腳本所在位置的上兩層 → skills/memory-backup/scripts/ 的上上層）
     script_dir = os.path.dirname(os.path.abspath(__file__))
     export_script = os.path.join(script_dir, "export_jsonl.py")
-    venv_python = os.path.join(base_dir, ".venv", "Scripts", "python")
+    
+    # 優先尋找腳本專案下的 .venv（即 skills/ 的上層），其次尋找 base_dir 底下的 .venv
+    proj_root = os.path.abspath(os.path.join(script_dir, "..", "..", ".."))
+    venv_python = os.path.join(proj_root, ".venv", "Scripts", "python")
+    if not os.path.exists(venv_python + ".exe"):
+        venv_python = os.path.join(base_dir, ".venv", "Scripts", "python")
     if not os.path.exists(venv_python + ".exe"):
         venv_python = sys.executable
 

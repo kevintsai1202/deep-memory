@@ -38,7 +38,10 @@ python skills/memory-import/scripts/import.py --source autoskill --input path/to
 python skills/memory-import/scripts/import.py --source autoskill --input path/to/old-project --force
 ```
 
-Pass `--workspace <path>` if the target knowledge base isn't in the current directory (same convention as every other script in this skill pack).
+**Workspace Storage Path Resolution:**
+By default, deep-memory uses the user's global directory `~/.deep-memory` (which resolves to `C:\Users\<username>\.deep-memory` on Windows) to store all knowledge bases, cold notes, and database files.
+- If you want to use a specific directory, set the `DEEP_MEMORY_WORKSPACE` environment variable (e.g., `DEEP_MEMORY_WORKSPACE="."` or `DEEP_MEMORY_WORKSPACE="D:\my-memories"`).
+- You can also pass `--workspace <path>` to any script to override the workspace path for that specific command (e.g., pass `--workspace <path>` if you want to import into a specific project's directory instead of the global store).
 
 ## Dedup Behavior
 

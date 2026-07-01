@@ -13,7 +13,12 @@ if hasattr(sys.stdout, 'reconfigure'):
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="ChromaDB Indexing Script")
-    parser.add_argument("--workspace", type=str, default=os.getcwd(), help="Workspace root path")
+    # 優先從環境變數 DEEP_MEMORY_WORKSPACE 取得工作目錄，否則預設為使用者家目錄下的 .deep-memory
+    default_ws = os.environ.get("DEEP_MEMORY_WORKSPACE")
+    if not default_ws:
+        default_ws = os.path.join(os.path.expanduser("~"), ".deep-memory")
+
+    parser.add_argument("--workspace", type=str, default=default_ws, help="Workspace root path")
     args = parser.parse_args()
 
     base_dir = os.path.abspath(args.workspace)

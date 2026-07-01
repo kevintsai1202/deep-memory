@@ -17,7 +17,12 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 def main():
     parser = argparse.ArgumentParser(description="Append a raw note to cold store (cold-notes/raw.jsonl)")
-    parser.add_argument("--workspace",  type=str, default=os.getcwd(), help="工作目錄根路徑")
+    # 優先從環境變數 DEEP_MEMORY_WORKSPACE 取得工作目錄，否則預設為使用者家目錄下的 .deep-memory
+    default_ws = os.environ.get("DEEP_MEMORY_WORKSPACE")
+    if not default_ws:
+        default_ws = os.path.join(os.path.expanduser("~"), ".deep-memory")
+
+    parser.add_argument("--workspace",  type=str, default=default_ws, help="工作目錄根路徑")
     parser.add_argument("--topic",      type=str, required=True,  help="本條記錄的主題（一句話）")
     parser.add_argument("--content",    type=str, required=True,  help="詳細內容（可包含步驟、程式碼片段等）")
     parser.add_argument("--tags",       type=str, default="",     help="逗號分隔的標籤（如 backend,fastapi,session）")

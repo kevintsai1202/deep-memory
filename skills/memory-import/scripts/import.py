@@ -374,7 +374,12 @@ def main():
                         help="External memory source type")
     parser.add_argument("--input", type=str, required=True,
                         help="Path to the source file (chatgpt) or directory (claude-local, autoskill)")
-    parser.add_argument("--workspace", type=str, default=os.getcwd(),
+    # 優先從環境變數 DEEP_MEMORY_WORKSPACE 取得工作目錄，否則預設為使用者家目錄下的 .deep-memory
+    default_ws = os.environ.get("DEEP_MEMORY_WORKSPACE")
+    if not default_ws:
+        default_ws = os.path.join(os.path.expanduser("~"), ".deep-memory")
+
+    parser.add_argument("--workspace", type=str, default=default_ws,
                         help="Workspace root path (parent of knowledge-base/, cold-notes/)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Preview what would be imported without writing any files")

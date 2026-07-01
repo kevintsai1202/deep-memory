@@ -98,8 +98,13 @@ def restore_folder(src_folder: str, dest_folder: str, overwrite: bool):
 
 def main():
     parser = argparse.ArgumentParser(description="Restore knowledge base from GitHub backup repo")
-    parser.add_argument("--workspace", type=str, default=os.getcwd(),
-                        help="工作目錄（知識庫還原的目標根目錄），預設為當前目錄")
+    # 優先從環境變數 DEEP_MEMORY_WORKSPACE 取得工作目錄，否則預設為使用者家目錄下的 .deep-memory
+    default_ws = os.environ.get("DEEP_MEMORY_WORKSPACE")
+    if not default_ws:
+        default_ws = os.path.join(os.path.expanduser("~"), ".deep-memory")
+
+    parser.add_argument("--workspace", type=str, default=default_ws,
+                        help="工作目錄（知識庫還原的目標根目錄），預設為全域目錄")
     # 固定預設值需與 backup.py 一致，否則還原時抓錯 repo
     parser.add_argument("--repo", type=str, default="deep-memory-knowledge",
                         help="GitHub backup repo 名稱（預設：deep-memory-knowledge）")

@@ -12,7 +12,12 @@ This skill provides local RAG retrieval by combining vector search (semantic) wi
 > - **Windows (PowerShell):** `.venv\Scripts\python`
 > - **Linux / macOS:** `.venv/bin/python`
 >
-> All `skills/...` paths assume the skill pack lives inside your current project (project-local install). If you installed the skills globally (e.g. `~/.agents/skills/`), point to that location instead and add `--workspace "<your-project>"`.
+> > All `skills/...` paths assume the skill pack lives inside your current project (project-local install).
+>
+> **Workspace Storage Path Resolution:**
+> By default, deep-memory uses the user's global directory `~/.deep-memory` (which resolves to `C:\Users\<username>\.deep-memory` on Windows) to store all knowledge bases, cold notes, and database files. This unifies memories across all your project workspaces.
+> - If you want to use a specific directory, set the `DEEP_MEMORY_WORKSPACE` environment variable (e.g., `DEEP_MEMORY_WORKSPACE="."` or `DEEP_MEMORY_WORKSPACE="D:\my-memories"`).
+> - You can also pass `--workspace <path>` to any script to override the workspace path for that specific command.
 
 ## ⚙️ First-Time Initialization (Bootstrap)
 

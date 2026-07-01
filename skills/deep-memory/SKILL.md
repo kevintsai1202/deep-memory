@@ -10,7 +10,12 @@ description: "Use at the start of any task, whenever another skill is about to b
 > - **Windows (PowerShell):** `.venv\Scripts\python`
 > - **Linux / macOS:** `.venv/bin/python`
 >
-> All `skills/...` paths assume the skill pack lives inside your current project (project-local install). If you installed the skills globally (e.g. `~/.agents/skills/`), point to that location instead and add `--workspace "<your-project>"`.
+> > All `skills/...` paths assume the skill pack lives inside your current project (project-local install).
+>
+> **Workspace Storage Path Resolution:**
+> By default, deep-memory uses the user's global directory `~/.deep-memory` (which resolves to `C:\Users\<username>\.deep-memory` on Windows) to store all knowledge bases, cold notes, and database files. This unifies memories across all your project workspaces.
+> - If you want to use a specific directory, set the `DEEP_MEMORY_WORKSPACE` environment variable (e.g., `DEEP_MEMORY_WORKSPACE="."` or `DEEP_MEMORY_WORKSPACE="D:\my-memories"`).
+> - You can also pass `--workspace <path>` to any script to override the workspace path for that specific command.
 >
 > **Which scripts actually need `<PY>` (the venv):** only `search.py`, `update_db.py`, and `export_jsonl.py` — they import `chromadb`/`sentence-transformers`. `seed.py`, `write_cold.py`, `backup.py`, `restore.py`, and `memory-import/scripts/import.py` use only Python's standard library: any available `python`/`python3` works for those, no venv or `pip install` required. This matters because cold-store writes (Step 5.1) start from turn one, often before the venv exists.
 
@@ -180,11 +185,12 @@ For cold-store write triggers, vectorization timing, the cold→hot refinement w
 
 ## Storage Paths
 
-- Knowledge index: `knowledge-base/_index.json`
-- Knowledge content: `knowledge-base/[category].md`
-- Experience index: `experience/_index.json`
-- Experience content: `experience/skill-[skill-id].md`
-- Cold store content: `cold-notes/raw.jsonl` (written every turn — see Step 5.1)
+By default, files are stored relative to the resolved workspace root (global `~/.deep-memory` unless overridden by `DEEP_MEMORY_WORKSPACE` or `--workspace`):
+- Knowledge index: `<workspace>/knowledge-base/_index.json`
+- Knowledge content: `<workspace>/knowledge-base/[category].md`
+- Experience index: `<workspace>/experience/_index.json`
+- Experience content: `<workspace>/experience/skill-[skill-id].md`
+- Cold store content: `<workspace>/cold-notes/raw.jsonl` (written every turn — see Step 5.1)
 
 ---
 

@@ -45,7 +45,12 @@ def main():
     parser.add_argument("--limit", type=int, default=4, help="Maximum results to return")
     parser.add_argument("--candidate-limit", type=int, default=10, help="Candidates to fetch before reranking")
     parser.add_argument("--min-score", type=float, default=0.0, help="Minimum rerank score filter")
-    parser.add_argument("--workspace", type=str, default=os.getcwd(), help="Workspace root path")
+    # 優先從環境變數 DEEP_MEMORY_WORKSPACE 取得工作目錄，否則預設為使用者家目錄下的 .deep-memory
+    default_ws = os.environ.get("DEEP_MEMORY_WORKSPACE")
+    if not default_ws:
+        default_ws = os.path.join(os.path.expanduser("~"), ".deep-memory")
+
+    parser.add_argument("--workspace", type=str, default=default_ws, help="Workspace root path")
     parser.add_argument("--skill", type=str, default=None, help="Filter to entries tagged with this skill-id (exact match)")
     parser.add_argument("--tag", type=str, default=None, help="Filter to entries whose tags array contains this value")
     args = parser.parse_args()

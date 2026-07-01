@@ -46,8 +46,13 @@ def save_index(index_data, kb_index_path):
 
 def main():
     parser = argparse.ArgumentParser(description="Seed initial knowledge base from deep-memory bundled seeds")
-    parser.add_argument("--workspace", type=str, default=os.getcwd(),
-                        help="工作目錄（knowledge-base/ 的父目錄），預設為當前目錄")
+    # 優先從環境變數 DEEP_MEMORY_WORKSPACE 取得工作目錄，否則預設為使用者家目錄下的 .deep-memory
+    default_ws = os.environ.get("DEEP_MEMORY_WORKSPACE")
+    if not default_ws:
+        default_ws = os.path.join(os.path.expanduser("~"), ".deep-memory")
+
+    parser.add_argument("--workspace", type=str, default=default_ws,
+                        help="工作目錄（knowledge-base/ 的父目錄），預設為全域目錄")
     parser.add_argument("--force", action="store_true",
                         help="強制覆蓋：若種子分類已存在，以種子版本覆蓋（預設為跳過已存在的分類）")
     args = parser.parse_args()
