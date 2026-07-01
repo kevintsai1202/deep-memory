@@ -133,6 +133,7 @@ def parse_frontmatter(raw_text):
     解析簡化版 YAML frontmatter（name / description / metadata.type），回傳 (fields, body)。
     只處理本專案 memory 檔案實際會用到的兩層結構，不是通用 YAML parser。
     """
+    raw_text = raw_text.replace("\r\n", "\n")
     m = _FRONTMATTER_RE.match(raw_text)
     if not m:
         return {}, raw_text
@@ -241,6 +242,11 @@ def write_claude_local_to_hot(memories, workspace, dry_run):
         )
         new_blocks.append(block)
         all_keywords.update(part for part in mem["name"].split("-") if part)
+        all_keywords.update(
+            word.strip(".,!?;:()[]\"'").lower()
+            for word in mem["description"].split()
+            if len(word.strip(".,!?;:()[]\"'")) > 2
+        )
 
     if dry_run:
         print(f"[DRY-RUN] 會寫入 {len(new_blocks)} 筆到 {category_path}（{skipped} 筆已存在跳過）")
