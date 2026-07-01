@@ -125,12 +125,146 @@ def write_to_cold(texts, workspace, dry_run):
         print("  python skills/chroma-hybrid-search/scripts/update_db.py --workspace " + workspace)
 
 
+_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n(.*)$", re.DOTALL)
+
+
+def parse_frontmatter(raw_text):
+    """
+    解析簡化版 YAML frontmatter（name / description / metadata.type），回傳 (fields, body)。
+    只處理本專案 memory 檔案實際會用到的兩層結構，不是通用 YAML parser。
+    """
+    m = _FRONTMATTER_RE.match(raw_text)
+    if not m:
+        return {}, raw_text
+
+    header, body = m.group(1), m.group(2)
+    fields = {}
+    current_key = None
+    for line in header.splitlines():
+        if not line.strip():
+            continue
+        if line.startswith("  ") and current_key == "metadata":
+            sub_match = re.match(r"\s*(\w+):\s*(.*)", line)
+            if sub_match:
+                fields[f"metadata.{sub_match.group(1)}"] = sub_match.group(2).strip().strip('"').strip("'")
+            continue
+        key_match = re.match(r"(\w+):\s*(.*)", line)
+        if key_match:
+            key, value = key_match.group(1), key_match.group(2).strip()
+            fields[key] = value.strip('"').strip("'")
+            current_key = key
+
+    return fields, body.strip()
+
+
 def parse_claude_local(input_dir):
-    raise NotImplementedError
+    """掃描 Claude Code 本機 memory/ 目錄，回傳 [{name, description, type, body}, ...]"""
+    results = []
+    skipped = 0
+    for filename in sorted(os.listdir(input_dir)):
+        if not filename.endswith(".md") or filename == "MEMORY.md":
+            continue
+        path = os.path.join(input_dir, filename)
+        with open(path, "r", encoding="utf-8") as f:
+            raw = f.read()
+        fields, body = parse_frontmatter(raw)
+        name = fields.get("name")
+        description = fields.get("description")
+        if not name or not description:
+            print(f"[WARN] 跳過 {filename}：缺少 name 或 description")
+            skipped += 1
+            continue
+        results.append({
+            "name": name,
+            "description": description,
+            "type": fields.get("metadata.type", "unknown"),
+            "body": body,
+        })
+    if skipped:
+        print(f"[WARN] 共跳過 {skipped} 個檔案（缺少必要欄位）")
+    return results
+
+
+def update_kb_index(kb_dir, cat_id, cat_file, title, new_keywords):
+    """更新 knowledge-base/_index.json：分類已存在則合併 keywords，否則新增一筆"""
+    index_path = os.path.join(kb_dir, "_index.json")
+    if os.path.exists(index_path):
+        with open(index_path, "r", encoding="utf-8") as f:
+            index = json.load(f)
+    else:
+        index = {"_version": 1, "categories": []}
+
+    for cat in index["categories"]:
+        if cat["id"] == cat_id:
+            cat["keywords"] = sorted(set(cat.get("keywords", [])) | set(new_keywords))
+            break
+    else:
+        index["categories"].append({
+            "id": cat_id,
+            "file": cat_file,
+            "title": title,
+            "keywords": sorted(new_keywords),
+        })
+
+    with open(index_path, "w", encoding="utf-8") as f:
+        json.dump(index, f, ensure_ascii=False, indent=2)
 
 
 def write_claude_local_to_hot(memories, workspace, dry_run):
-    raise NotImplementedError
+    """把 Claude 本機記憶寫進熱庫的 imported-claude-memory.md 分類，以隱藏標記去重"""
+    kb_dir = os.path.join(workspace, "knowledge-base")
+    category_file = "imported-claude-memory.md"
+    category_path = os.path.join(kb_dir, category_file)
+
+    existing_content = ""
+    if os.path.exists(category_path):
+        with open(category_path, "r", encoding="utf-8") as f:
+            existing_content = f.read()
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    new_blocks = []
+    skipped = 0
+    all_keywords = set()
+
+    for mem in memories:
+        marker = f"<!-- imported-from: claude-local:{mem['name']} -->"
+        if marker in existing_content:
+            skipped += 1
+            continue
+        block = (
+            f"## 🔧 {mem['description']}\n"
+            f"**Date:** {today}\n"
+            f"**Context:** Imported from Claude Code local memory (type: {mem['type']})\n"
+            f"**Best Practices:**\n"
+            f"{mem['body']}\n"
+            f"{marker}\n"
+        )
+        new_blocks.append(block)
+        all_keywords.update(part for part in mem["name"].split("-") if part)
+
+    if dry_run:
+        print(f"[DRY-RUN] 會寫入 {len(new_blocks)} 筆到 {category_path}（{skipped} 筆已存在跳過）")
+        for mem in memories:
+            print(f"  - {mem['name']}: {mem['description']}")
+        return
+
+    if not new_blocks:
+        print(f"[OK] 沒有新內容需要寫入（{skipped} 筆已存在）")
+        return
+
+    os.makedirs(kb_dir, exist_ok=True)
+    with open(category_path, "a", encoding="utf-8") as f:
+        if not existing_content:
+            f.write("# Imported from Claude Code Local Memory\n\n")
+        for block in new_blocks:
+            f.write("\n" + block)
+
+    update_kb_index(kb_dir, "imported-claude-memory", category_file,
+                     "Imported from Claude Code Local Memory", all_keywords)
+
+    print(f"[OK] 已寫入 {len(new_blocks)} 筆到熱庫（{skipped} 筆已存在跳過）")
+    print("[下一步] 執行 update_db.py 讓新內容可以被語意搜尋找到：")
+    print("  python skills/chroma-hybrid-search/scripts/update_db.py --workspace " + workspace)
 
 
 def merge_autoskill(input_dir, workspace, force, dry_run):
