@@ -83,12 +83,15 @@ skills/
 │       ├── search.py            # RAG retrieval + rerank
 │       ├── update_db.py         # Local vector database init / update
 │       └── write_cold.py        # Instant write to the cold store (cold-notes/)
-└── memory-backup/
-    ├── SKILL.md                 # GitHub backup/restore sub-skill spec
-    └── scripts/
-        ├── backup.py            # Export and safely push to a private GitHub repo
-        ├── restore.py           # Restore the knowledge base from GitHub on any device
-        └── export_jsonl.py      # ChromaDB → portable JSONL export
+├── memory-backup/
+│   ├── SKILL.md                 # GitHub backup/restore sub-skill spec
+│   └── scripts/
+│       ├── backup.py            # Export and safely push to a private GitHub repo
+│       ├── restore.py           # Restore the knowledge base from GitHub on any device
+│       └── export_jsonl.py      # ChromaDB → portable JSONL export
+└── memory-import/
+    ├── SKILL.md                 # External memory import sub-skill spec
+    └── scripts/import.py        # Imports ChatGPT / Claude local / legacy auto-skill data
 ```
 
 ### 2) Private Data Store (created under your project after install)
@@ -114,14 +117,40 @@ your-project/
 
 | Model | Where the skills live | Command path | Best for |
 |---|---|---|---|
-| **In-project (default, simplest)** | Copy `skills/` into your project root | Use `skills/...` directly (matches every SKILL.md example) | A single project, want it portable |
+| **Quick install (recommended)** | `npx skills add` fetches straight from GitHub into `.claude/skills/` | Use `.claude/skills/...` (or wherever the tool placed them) | Fastest way to get started, no manual copying |
+| **In-project** | Copy `skills/` into your project root | Use `skills/...` directly (matches every SKILL.md example) | A single project, want it portable |
 | **Global** | Copy to `~/.agents/skills/` (or your agent's skill library) | Point to that global path instead, and add `--workspace "<your-project>"` to every script call | Multiple projects sharing one skill install |
 
 > All data directories (`knowledge-base/`, `experience/`, `chroma_hybrid_db/`) are always created under **your project**, regardless of where the skills themselves live — the scripts use `--workspace` (default: the current directory) to decide where to read/write.
 
+#### Quick Install with `npx skills add`
+
+[`skills`](https://github.com/vercel-labs/skills) is a small CLI that installs Agent Skills straight from a public GitHub repo — no cloning needed. Since this repo keeps its skills under `skills/`, the tool discovers them automatically:
+
+```bash
+# Preview what's available before installing
+npx skills add kevintsai1202/deep-memory --list
+
+# Install everything, no prompts (shorthand for --skill '*' --agent '*' -y)
+npx skills add kevintsai1202/deep-memory --all
+
+# Or be explicit about the target agent instead of --all
+npx skills add kevintsai1202/deep-memory --skill '*' -a claude-code
+
+# Or install just the core skill
+npx skills add kevintsai1202/deep-memory --skill deep-memory -a claude-code
+
+# Add -g to install into your global skill library instead of the current project
+npx skills add kevintsai1202/deep-memory --skill '*' -a claude-code -g
+```
+
+> `--all` also installs into **every** agent the CLI recognizes (Claude Code, Cursor, Codex, etc.), not just Claude Code — use `--skill '*' -a claude-code` if you only want it in `.claude/skills/`.
+
+This only places the skill files — you still need to run the Python initialization steps below once per project.
+
 ### Initialization Steps
 
-1. Pick an install model from the table above and place `skills/` accordingly.
+1. Pick an install model from the table above and place `skills/` accordingly (skip this if you used `npx skills add`).
 2. Initialize the virtual environment, install dependencies, seed the bundled knowledge base, and build the local vector index (**no need to activate — call the venv's Python directly**):
 
    **Windows (PowerShell)**
@@ -141,3 +170,5 @@ your-project/
    ```
 
    `knowledge-base/` is created by `seed.py`; `experience/` and `cold-notes/` are created automatically the first time something is written to them — no manual `mkdir` needed.
+
+   > If you installed via `npx skills add`, swap `skills/...` above for wherever it placed the files (typically `.claude/skills/...` for a project install, or `~/.claude/skills/...` with `-g`).
