@@ -121,11 +121,11 @@ your-project/
 
 | 模型                 | 技能放哪                                                | 指令路徑                                                                | 適用                         |
 | ---------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------ |
-| **快速安裝（推薦）** | 用`npx skills add` 直接從 GitHub 抓進 `.claude/skills/` | 用`.claude/skills/...`（或工具實際放置的位置）                          | 想最快上手、不想手動複製檔案 |
-| **專案內**           | 把`skills/` 複製到專案根目錄                            | 直接用`skills/...`（各 SKILL.md 的範例即如此）                          | 單一專案、想要可攜           |
-| **全域**             | 複製到`~/.agents/skills/`（或你的 Agent 技能庫）        | 改成該全域路徑，並對每個腳本加上`--workspace "<你的專案>"` 指定資料目錄 | 多專案共用同一套技能         |
+| **全域（推薦）**             | 複製到你的 Agent 全域技能庫（例如 Antigravity 的 `~/.gemini/config/skills/`、Claude Code 的 `~/.claude/skills/`）        | 使用全域路徑，或直接作為全域 Agent 技能調用 | 最推薦的預設模式，多專案共用同一套技能 |
+| **快速安裝** | 用`npx skills add -g` 直接從 GitHub 抓進全域技能庫 | 使用全域路徑（例如 `~/.gemini/config/skills/...`） | 最快完成全域安裝的方式 |
+| **專案內**           | 把`skills/` 複製到專案根目錄                            | 直接用`skills/...`（各 SKILL.md 的範例即如此）                          | 單一專案、想要完全獨立與可攜 |
 
-> 所有資料目錄（`knowledge-base/`、`experience/`、`chroma_hybrid_db/`）一律建立在「你的專案」下，與技能放哪無關——腳本透過 `--workspace`（預設為當前目錄）決定讀寫位置。
+> 所有資料目錄（`knowledge-base/`、`experience/`、`chroma_hybrid_db/`）一律建立在「你的專案」下（或全域指定路徑），與技能放哪無關——腳本透過 `--workspace`（預設為當前目錄）決定讀寫位置。
 
 #### 用 `npx skills add` 快速安裝
 
@@ -135,20 +135,18 @@ your-project/
 # 安裝前先預覽有哪些技能
 npx skills add kevintsai1202/deep-memory --list
 
-# 全裝、不詢問（等同 --skill '*' --agent '*' -y 的簡寫）
-npx skills add kevintsai1202/deep-memory --all
+# 全域安裝所有技能、不詢問（等同 --skill '*' --agent '*' -y -g 的簡寫）
+npx skills add kevintsai1202/deep-memory --all -g
 
-# 或明確指定只裝到 Claude Code，而不是用 --all
-npx skills add kevintsai1202/deep-memory --skill '*' -a claude-code
-
-# 或只安裝核心技能
-npx skills add kevintsai1202/deep-memory --skill deep-memory -a claude-code
-
-# 加上 -g 可改為安裝到全域技能庫，而不是目前專案
+# 或明確指定只安裝到 Claude Code 的全域技能庫
 npx skills add kevintsai1202/deep-memory --skill '*' -a claude-code -g
+
+# 或只全域安裝核心技能
+npx skills add kevintsai1202/deep-memory --skill deep-memory -a claude-code -g
 ```
 
-> `--all` 會把技能裝進 CLI 認得的**每一個** Agent（Claude Code、Cursor、Codex 等），不只 Claude Code；如果只想裝進 `.claude/skills/`，請用 `--skill '*' -a claude-code`。
+> 加上 `-g` 會把技能裝進你的全域技能庫（例如 `~/.gemini/config/skills/` 或 `~/.claude/skills/`），這能讓你在所有專案中都能存取這些技能。
+> `--all` 會把技能裝進 CLI 認得的**每一個** Agent（Claude Code、Cursor、Codex 等）；如果只想裝進特定 Agent 的全域路徑，請用 `-a <agent-name> -g`。
 
 這只會放好技能檔案，下方的 Python 初始化步驟每個專案仍須執行一次。
 
@@ -175,5 +173,5 @@ npx skills add kevintsai1202/deep-memory --skill '*' -a claude-code -g
    ```
    `knowledge-base/` 由 `seed.py` 自動建立；`experience/` 與 `cold-notes/` 則在第一次真正寫入時自動建立，不需手動 `mkdir`。
 
-   > 若你是用 `npx skills add` 安裝，請把上面的 `skills/...` 換成該工具實際放置的位置（專案安裝通常是 `.claude/skills/...`；加 `-g` 則是 `~/.claude/skills/...`）。
+   > 若你是安裝在全域（推薦）或使用 `npx skills add -g` 安裝，請把上面的 `skills/...` 換成該工具實際放置的位置（例如 `~/.gemini/config/skills/...` 或 `~/.claude/skills/...`）。
    >

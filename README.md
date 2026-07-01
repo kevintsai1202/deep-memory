@@ -117,11 +117,11 @@ your-project/
 
 | Model | Where the skills live | Command path | Best for |
 |---|---|---|---|
-| **Quick install (recommended)** | `npx skills add` fetches straight from GitHub into `.claude/skills/` | Use `.claude/skills/...` (or wherever the tool placed them) | Fastest way to get started, no manual copying |
-| **In-project** | Copy `skills/` into your project root | Use `skills/...` directly (matches every SKILL.md example) | A single project, want it portable |
-| **Global** | Copy to `~/.agents/skills/` (or your agent's skill library) | Point to that global path instead, and add `--workspace "<your-project>"` to every script call | Multiple projects sharing one skill install |
+| **Global (recommended)** | Copy to your agent's global skill library (e.g., `~/.gemini/config/skills/` for Antigravity, `~/.claude/skills/` for Claude Code) | Point to that global path, or use it directly as a global agent skill | Best default, sharing one skill installation across all workspaces |
+| **Quick install** | `npx skills add -g` fetches straight from GitHub into your global agent skill library | Use global paths (e.g., `~/.gemini/config/skills/...`) | Fastest way to get started with global installation |
+| **In-project** | Copy `skills/` into your project root | Use `skills/...` directly (matches every SKILL.md example) | Single project use-case, want it fully self-contained |
 
-> All data directories (`knowledge-base/`, `experience/`, `chroma_hybrid_db/`) are always created under **your project**, regardless of where the skills themselves live — the scripts use `--workspace` (default: the current directory) to decide where to read/write.
+> All data directories (`knowledge-base/`, `experience/`, `chroma_hybrid_db/`) are always created under **your project** (or a globally configured path if configured), regardless of where the skills themselves live — the scripts use `--workspace` (default: the current directory) to decide where to read/write.
 
 #### Quick Install with `npx skills add`
 
@@ -131,22 +131,20 @@ your-project/
 # Preview what's available before installing
 npx skills add kevintsai1202/deep-memory --list
 
-# Install everything, no prompts (shorthand for --skill '*' --agent '*' -y)
-npx skills add kevintsai1202/deep-memory --all
+# Install everything globally, no prompts (shorthand for --skill '*' --agent '*' -y -g)
+npx skills add kevintsai1202/deep-memory --all -g
 
-# Or be explicit about the target agent instead of --all
-npx skills add kevintsai1202/deep-memory --skill '*' -a claude-code
-
-# Or install just the core skill
-npx skills add kevintsai1202/deep-memory --skill deep-memory -a claude-code
-
-# Add -g to install into your global skill library instead of the current project
+# Or be explicit about the target agent and install globally
 npx skills add kevintsai1202/deep-memory --skill '*' -a claude-code -g
+
+# Or install just the core skill globally
+npx skills add kevintsai1202/deep-memory --skill deep-memory -a claude-code -g
 ```
 
-> `--all` also installs into **every** agent the CLI recognizes (Claude Code, Cursor, Codex, etc.), not just Claude Code — use `--skill '*' -a claude-code` if you only want it in `.claude/skills/`.
+> Adding `-g` installs the skills into your global skill library (e.g. `~/.gemini/config/skills/` or `~/.claude/skills/`), making them available across all your workspaces.
+> `--all` installs into **every** agent the CLI recognizes (Claude Code, Cursor, Codex, etc.). Use `-a <agent-name> -g` if you only want it in a specific agent's global path.
 
-This only places the skill files — you still need to run the Python initialization steps below once per project.
+This only places the skill files — you still need to run the Python initialization steps below once per project workspace.
 
 ### Initialization Steps
 
@@ -171,4 +169,4 @@ This only places the skill files — you still need to run the Python initializa
 
    `knowledge-base/` is created by `seed.py`; `experience/` and `cold-notes/` are created automatically the first time something is written to them — no manual `mkdir` needed.
 
-   > If you installed via `npx skills add`, swap `skills/...` above for wherever it placed the files (typically `.claude/skills/...` for a project install, or `~/.claude/skills/...` with `-g`).
+   > If you installed globally (recommended) or via `npx skills add -g`, swap `skills/...` in the commands above for the actual path where the files were placed (typically `~/.gemini/config/skills/...` or `~/.claude/skills/...`).
