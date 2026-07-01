@@ -149,8 +149,8 @@ Skip only if the turn had nothing to record (a bare acknowledgment, no other con
    # ① Rebuild the local vector index (so RAG can find the new record)
    <PY> skills/chroma-hybrid-search/scripts/update_db.py
 
-   # ② Back up to GitHub (preserve a portable JSONL snapshot)
-   <PY> skills/memory-backup/scripts/backup.py --repo my-knowledge
+   # ② Back up to GitHub (preserve a portable JSONL snapshot; --repo defaults to super-memory-knowledge)
+   <PY> skills/memory-backup/scripts/backup.py
    ```
 
 If a non-super-memory skill was used this turn and is not in `experience/_index.json`, proactively ask at task end whether to record the experience, naming the specific skill, e.g.:

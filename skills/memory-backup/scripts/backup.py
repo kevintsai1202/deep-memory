@@ -82,7 +82,9 @@ def copy_knowledge_to_backup(base_dir: str, backup_dir: str):
 def main():
     parser = argparse.ArgumentParser(description="Backup knowledge base to GitHub")
     parser.add_argument("--workspace", type=str, default=os.getcwd(), help="Workspace root path")
-    parser.add_argument("--repo", type=str, required=True, help="GitHub repo name (e.g. my-knowledge)")
+    # 固定預設 repo 名稱：多數使用者永遠不用打 --repo，天然避免跨裝置/跨時間打錯字造成備份分裂成兩個倉庫；
+    # 仍保留覆蓋能力給真的需要自訂名稱的情境
+    parser.add_argument("--repo", type=str, default="super-memory-knowledge", help="GitHub repo name (default: super-memory-knowledge)")
     parser.add_argument("--visibility", type=str, default="private",
                         choices=["private", "public"], help="Repo visibility")
     parser.add_argument("--message", type=str, default="", help="Custom commit message")

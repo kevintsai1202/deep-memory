@@ -52,19 +52,26 @@ gh auth login
 
 ## 🚀 Backup Commands
 
+`--repo` defaults to **`super-memory-knowledge`** — omit it entirely unless you specifically want a different repo name. This is deliberate: a fixed default means the same repo name every time, on every device, with no risk of a typo or a forgotten name silently creating a second, disconnected backup repo. Pass `--repo <name>` only to override.
+
 ### First Backup (Auto-creates GitHub private repo)
 ```bash
-<PY> skills/memory-backup/scripts/backup.py --repo my-knowledge
+<PY> skills/memory-backup/scripts/backup.py
 ```
 
 ### Incremental Backup (Run regularly)
 ```bash
-<PY> skills/memory-backup/scripts/backup.py --repo my-knowledge --message "feat: add spring session notes"
+<PY> skills/memory-backup/scripts/backup.py --message "feat: add spring session notes"
 ```
 
 ### Public Backup (Share your knowledge base)
 ```bash
-<PY> skills/memory-backup/scripts/backup.py --repo my-knowledge --visibility public
+<PY> skills/memory-backup/scripts/backup.py --visibility public
+```
+
+### Using a Different Repo Name
+```bash
+<PY> skills/memory-backup/scripts/backup.py --repo my-custom-name
 ```
 
 > **🛡️ Safe push (no force-overwrite):** Before pushing, the script fetches the remote and checks whether it contains commits the local backup does not have (e.g. a backup pushed from another device). If the remote is ahead, the push is **aborted with a warning** rather than force-overwriting — so one machine can never silently clobber another machine's backup. To reconcile, run `restore.py` first, then back up again.
@@ -80,19 +87,21 @@ Complete the super-memory skill package installation on the new device. Refer to
 
 #### Step 2: Run the restore script
 
+`--repo` defaults to the same **`super-memory-knowledge`** as `backup.py` — omit it unless you backed up under a custom name, in which case pass the same `--repo <name>` here too.
+
 **Safe mode (recommended) — only copies files that exist on GitHub but are missing locally; does not overwrite existing files:**
 ```bash
-<PY> skills/memory-backup/scripts/restore.py --repo my-knowledge
+<PY> skills/memory-backup/scripts/restore.py
 ```
 
 **Overwrite mode — completely replaces the local knowledge base with the GitHub backup (use on a fresh device or for intentional sync):**
 ```bash
-<PY> skills/memory-backup/scripts/restore.py --repo my-knowledge --overwrite
+<PY> skills/memory-backup/scripts/restore.py --overwrite
 ```
 
 **Restore to a specific directory (not the current directory):**
 ```bash
-<PY> skills/memory-backup/scripts/restore.py --repo my-knowledge --workspace "D:\Projects\my-project"
+<PY> skills/memory-backup/scripts/restore.py --workspace "D:\Projects\my-project"
 ```
 
 #### Step 3: Rebuild the local vector index
@@ -145,5 +154,5 @@ After completing any knowledge base write this session, the Agent must remind th
 <PY> skills/chroma-hybrid-search/scripts/update_db.py
 
 # ② Back up to GitHub
-<PY> skills/memory-backup/scripts/backup.py --repo my-knowledge
+<PY> skills/memory-backup/scripts/backup.py
 ```

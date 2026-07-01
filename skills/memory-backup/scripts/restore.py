@@ -100,8 +100,9 @@ def main():
     parser = argparse.ArgumentParser(description="Restore knowledge base from GitHub backup repo")
     parser.add_argument("--workspace", type=str, default=os.getcwd(),
                         help="工作目錄（知識庫還原的目標根目錄），預設為當前目錄")
-    parser.add_argument("--repo", type=str, required=True,
-                        help="GitHub backup repo 名稱（如 my-knowledge）")
+    # 固定預設值需與 backup.py 一致，否則還原時抓錯 repo
+    parser.add_argument("--repo", type=str, default="super-memory-knowledge",
+                        help="GitHub backup repo 名稱（預設：super-memory-knowledge）")
     parser.add_argument("--overwrite", action="store_true",
                         help="覆蓋模式：完全取代本機的 knowledge-base/ 與 experience/。預設為安全模式（僅補入缺少的檔案）")
     args = parser.parse_args()
