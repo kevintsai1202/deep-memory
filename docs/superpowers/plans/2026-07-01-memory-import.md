@@ -261,7 +261,7 @@ pathlib.Path('.tmp-import-test/chatgpt-export.json').write_text(json.dumps(data)
 
 # Dry-run first
 python skills/memory-import/scripts/import.py --source chatgpt \
-  --input .tmp-import-test/chatgpt-export.json --workspace .tmp-import-test/ws
+  --input .tmp-import-test/chatgpt-export.json --workspace .tmp-import-test/ws --dry-run
 ```
 Expected: `[WARN] 跳過 1 筆空白或無法辨識內容的項目` then `[DRY-RUN] 會寫入 2 筆到 .../cold-notes/raw.jsonl（0 筆重複已跳過）` with both topics listed.
 
@@ -320,6 +320,7 @@ def parse_frontmatter(raw_text):
     解析簡化版 YAML frontmatter（name / description / metadata.type），回傳 (fields, body)。
     只處理本專案 memory 檔案實際會用到的兩層結構，不是通用 YAML parser。
     """
+    raw_text = raw_text.replace("\r\n", "\n")
     m = _FRONTMATTER_RE.match(raw_text)
     if not m:
         return {}, raw_text
@@ -438,6 +439,11 @@ def write_claude_local_to_hot(memories, workspace, dry_run):
         )
         new_blocks.append(block)
         all_keywords.update(part for part in mem["name"].split("-") if part)
+        all_keywords.update(
+            word.strip(".,!?;:()[]\"'").lower()
+            for word in mem["description"].split()
+            if len(word.strip(".,!?;:()[]\"'")) > 2
+        )
 
     if dry_run:
         print(f"[DRY-RUN] 會寫入 {len(new_blocks)} 筆到 {category_path}（{skipped} 筆已存在跳過）")
@@ -554,7 +560,10 @@ def _merge_autoskill_half(input_dir, workspace, subdir, force, dry_run):
 
     added, skipped = 0, 0
     for cat in src_categories:
-        cat_id = cat.get("id") or cat.get("skill_id") or cat.get("skill-id")
+        if "id" in cat:
+            cat_id = cat.get("id")
+        else:
+            cat_id = cat.get("skill_id") or cat.get("skill-id")
         cat_file = cat.get("file")
         if not cat_id or not cat_file:
             print(f"[WARN] {subdir}: 略過缺少 id/file 的索引項目：{cat}")
@@ -602,11 +611,17 @@ def _merge_autoskill_half(input_dir, workspace, subdir, force, dry_run):
 
 def merge_autoskill(input_dir, workspace, force, dry_run):
     """安全合併舊 auto-skill 格式的 knowledge-base/ 與 experience/ 到本機（id 存在則預設跳過）"""
+    total_added = 0
     for subdir in ("knowledge-base", "experience"):
         added, skipped = _merge_autoskill_half(input_dir, workspace, subdir, force, dry_run)
+        total_added += added
         label = "DRY-RUN" if dry_run else "OK"
         verb = "會處理" if dry_run else "已合併"
         print(f"[{label}] {subdir}: {verb} {added} 筆，跳過 {skipped} 筆（已存在，未加 --force）")
+
+    if not dry_run and total_added:
+        print("[下一步] 執行 update_db.py 讓新內容可以被語意搜尋找到：")
+        print("  python skills/chroma-hybrid-search/scripts/update_db.py --workspace " + workspace)
 ```
 
 - [ ] **Step 2: Verify with a fixture — new categories, existing skip, `--force` overwrite, missing half**
