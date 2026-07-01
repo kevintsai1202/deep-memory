@@ -54,14 +54,14 @@ def ensure_remote_repo(repo_name: str, visibility: str):
         print(f"[OK] Remote repo already exists: {remote_url}")
     else:
         print(f"[INFO] Creating remote repo: {user}/{repo_name} ({visibility})...")
-        run(f'gh repo create {repo_name} --{visibility} --description "Super-Memory knowledge base backup" --confirm', check=False)
+        run(f'gh repo create {repo_name} --{visibility} --description "Deep-Memory knowledge base backup" --confirm', check=False)
         # 新版 gh CLI 已移除 --confirm 旗標（呼叫會直接報錯，check=False 讓它安靜失敗）；
         # 新版在名稱／可見度等必要參數齊全時本就不會互動詢問，因此重試時直接省略該旗標即可
         result2 = subprocess.run(
             f"gh repo view {user}/{repo_name}", shell=True, capture_output=True
         )
         if result2.returncode != 0:
-            run(f'gh repo create {user}/{repo_name} --{visibility} --description "Super-Memory knowledge base backup"')
+            run(f'gh repo create {user}/{repo_name} --{visibility} --description "Deep-Memory knowledge base backup"')
         print(f"[OK] Created remote repo: {remote_url}")
 
     return remote_url
@@ -84,7 +84,7 @@ def main():
     parser.add_argument("--workspace", type=str, default=os.getcwd(), help="Workspace root path")
     # 固定預設 repo 名稱：多數使用者永遠不用打 --repo，天然避免跨裝置/跨時間打錯字造成備份分裂成兩個倉庫；
     # 仍保留覆蓋能力給真的需要自訂名稱的情境
-    parser.add_argument("--repo", type=str, default="super-memory-knowledge", help="GitHub repo name (default: super-memory-knowledge)")
+    parser.add_argument("--repo", type=str, default="deep-memory-knowledge", help="GitHub repo name (default: deep-memory-knowledge)")
     parser.add_argument("--visibility", type=str, default="private",
                         choices=["private", "public"], help="Repo visibility")
     parser.add_argument("--message", type=str, default="", help="Custom commit message")

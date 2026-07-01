@@ -1,6 +1,6 @@
 ---
 name: chroma-hybrid-search
-description: "Performs high-precision hybrid retrieval (BM25 + ChromaDB vector search + BGE-Reranker semantic re-ranking) over the local hot store (knowledge-base/, experience/) and cold store (cold-notes/raw.jsonl). Use this skill when high-accuracy code or solution retrieval is needed and AI hallucination must be minimized. Running for the first time in a directory will automatically trigger initialization. Typically invoked by super-memory's knowledge-base retrieval step when keyword matching is insufficient, but can also be called directly for ad-hoc searches."
+description: "Performs high-precision hybrid retrieval (BM25 + ChromaDB vector search + BGE-Reranker semantic re-ranking) over the local hot store (knowledge-base/, experience/) and cold store (cold-notes/raw.jsonl). Use this skill when high-accuracy code or solution retrieval is needed and AI hallucination must be minimized. Running for the first time in a directory will automatically trigger initialization. Typically invoked by deep-memory's knowledge-base retrieval step when keyword matching is insufficient, but can also be called directly for ad-hoc searches."
 ---
 
 # Chroma Hybrid Search Skill

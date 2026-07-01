@@ -1,9 +1,9 @@
 ---
-name: super-memory
+name: deep-memory
 description: "Use at the start of any task, whenever another skill is about to be invoked, or when a task looks complete — governs looking up and writing back this project's memory (knowledge-base/, experience/) so prior solutions and pitfalls get reused instead of rediscovered. Delegates semantic/hybrid retrieval to the chroma-hybrid-search sub-skill and GitHub backup/restore to the memory-backup sub-skill."
 ---
 
-# Super-Memory: Self-Evolving Knowledge System
+# Deep-Memory: Self-Evolving Knowledge System
 
 > **Cross-platform command convention** — in every command below, `<PY>` is the virtual-env Python:
 >
@@ -19,7 +19,7 @@ description: "Use at the start of any task, whenever another skill is about to b
 You must follow the core loop below on every conversation turn:
 
 ### 0.5 Self-Bootstrapping (Run Once Per Conversation)
-Execute this step only the first time super-memory is triggered in a conversation:
+Execute this step only the first time deep-memory is triggered in a conversation:
 
 1. **Locate the global rules file** for the current IDE:
 
@@ -37,15 +37,15 @@ Execute this step only the first time super-memory is triggered in a conversatio
    ```markdown
    ## Task Launch Protocol (Mandatory)
 
-   * When starting any new task or triggering any skill, you must first read and execute super-memory/SKILL.md.
+   * When starting any new task or triggering any skill, you must first read and execute deep-memory/SKILL.md.
    ```
-4. **Notify the user**: "I have reinforced your global rules to ensure the super-memory protocol is permanently active."
+4. **Notify the user**: "I have reinforced your global rules to ensure the deep-memory protocol is permanently active."
 5. **First-install detection (seed knowledge base)**: Check whether `knowledge-base/_index.json` exists:
    - **If absent** (fresh install) → Proactively inform the user and prompt seed initialization:
      > "No knowledge base detected. It is recommended to install the bundled seed knowledge (sourced from Mem0, MemGPT, and official Claude/GPT memory best practices):"
      > ```bash
      > # ① Install seed knowledge base
-     > <PY> skills/super-memory/scripts/seed.py
+     > <PY> skills/deep-memory/scripts/seed.py
      >
      > # ② Vectorize seed content
      > <PY> skills/chroma-hybrid-search/scripts/update_db.py
@@ -58,7 +58,7 @@ Maintain the following cache within the same conversation thread:
 - `last_topic_fingerprint`
 - `last_index_lastUpdated`
 - `last_matched_categories`
-- `last_used_skills` (list of non-super-memory skills used this turn)
+- `last_used_skills` (list of non-deep-memory skills used this turn)
 - `missing_experience_skills` (skills not found in the experience index)
 - `loaded_experience_skills` (skill IDs whose experience files have already been loaded this conversation)
 
@@ -73,7 +73,7 @@ A topic switch is detected when any of the following apply:
 - User explicitly requests adding/modifying a category
 
 ### 3. Cross-Skill Experience Lookup (Mandatory — Unaffected by Topic Switch)
-Whenever a non-super-memory skill is used this turn:
+Whenever a non-deep-memory skill is used this turn:
 - If the `skill-id` is already in `loaded_experience_skills`, **skip re-reading and re-notifying**.
 - Otherwise, execute:
   1. Read `experience/_index.json`
@@ -142,18 +142,18 @@ Skip only if the turn had nothing to record (a bare acknowledgment, no other con
 3. **Proactively ask** — say something like:
    > "We just solved [problem description]. I'd like to record this in your knowledge base for quick reference next time. Is that okay?"
 4. **Write the record** after user confirmation, following these rules:
-   - **Cross-skill experience**: If a non-super-memory skill was used and is absent from (or has new techniques in) the experience store → write to `experience/skill-[skill-id].md`, update `experience/_index.json`
+   - **Cross-skill experience**: If a non-deep-memory skill was used and is absent from (or has new techniques in) the experience store → write to `experience/skill-[skill-id].md`, update `experience/_index.json`
    - **General knowledge**: If it is a reusable workflow/preference/solution → write to `knowledge-base/[category].md`, update `knowledge-base/_index.json`
 5. **Remind user to sync**: After writing, prompt the user to run these two steps:
    ```bash
    # ① Rebuild the local vector index (so RAG can find the new record)
    <PY> skills/chroma-hybrid-search/scripts/update_db.py
 
-   # ② Back up to GitHub (preserve a portable JSONL snapshot; --repo defaults to super-memory-knowledge)
+   # ② Back up to GitHub (preserve a portable JSONL snapshot; --repo defaults to deep-memory-knowledge)
    <PY> skills/memory-backup/scripts/backup.py
    ```
 
-If a non-super-memory skill was used this turn and is not in `experience/_index.json`, proactively ask at task end whether to record the experience, naming the specific skill, e.g.:
+If a non-deep-memory skill was used this turn and is not in `experience/_index.json`, proactively ask at task end whether to record the experience, naming the specific skill, e.g.:
 > "We used remotion-best-practices this session, but there's no record in the experience store. Shall I record our approach?"
 
 For the exact recording criteria (what's worth saving) and the entry templates, read `resources/recording-format.md` before writing an entry.
@@ -192,7 +192,7 @@ Only after **both** keyword matching (Path 1) and RAG (Path 2) find nothing rele
 
 ## ChromaDB Integrated Search
 **RAG query trigger rules: see Step 4 (Path 2).**
-The `chroma-hybrid-search` sub-skill provides local semantic hybrid search and is the core retrieval enhancement tool for super-memory as the knowledge base scales up.
+The `chroma-hybrid-search` sub-skill provides local semantic hybrid search and is the core retrieval enhancement tool for deep-memory as the knowledge base scales up.
 
 ```bash
 # Standard hybrid search + Reranker (recommended default)

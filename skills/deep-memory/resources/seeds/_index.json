@@ -1,6 +1,6 @@
 {
   "_version": 1,
-  "_description": "Super-Memory bundled seed knowledge-base index (synthesized from Mem0, MemGPT, and official Claude/GPT memory best practices)",
+  "_description": "Deep-Memory bundled seed knowledge-base index (synthesized from Mem0, MemGPT, and official Claude/GPT memory best practices)",
   "categories": [
     {
       "id": "memory-management",

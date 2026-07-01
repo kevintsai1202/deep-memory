@@ -1,6 +1,6 @@
 ---
 name: memory-backup
-description: "Exports the local knowledge base (knowledge-base/, experience/) and ChromaDB vector data as JSONL, then backs it up to a dedicated private GitHub repository. Also supports cross-device restore from GitHub. Typically invoked by super-memory after new knowledge-base or experience entries are written in a session, but can also be run directly by the user at any time to back up or restore."
+description: "Exports the local knowledge base (knowledge-base/, experience/) and ChromaDB vector data as JSONL, then backs it up to a dedicated private GitHub repository. Also supports cross-device restore from GitHub. Typically invoked by deep-memory after new knowledge-base or experience entries are written in a session, but can also be run directly by the user at any time to back up or restore."
 ---
 
 # Memory Backup Skill — Knowledge Base GitHub Backup & Restore
@@ -52,7 +52,7 @@ gh auth login
 
 ## 🚀 Backup Commands
 
-`--repo` defaults to **`super-memory-knowledge`** — omit it entirely unless you specifically want a different repo name. This is deliberate: a fixed default means the same repo name every time, on every device, with no risk of a typo or a forgotten name silently creating a second, disconnected backup repo. Pass `--repo <name>` only to override.
+`--repo` defaults to **`deep-memory-knowledge`** — omit it entirely unless you specifically want a different repo name. This is deliberate: a fixed default means the same repo name every time, on every device, with no risk of a typo or a forgotten name silently creating a second, disconnected backup repo. Pass `--repo <name>` only to override.
 
 ### First Backup (Auto-creates GitHub private repo)
 ```bash
@@ -83,11 +83,11 @@ gh auth login
 ### Scenario: Restoring the knowledge base from GitHub on a new machine
 
 #### Step 1: Install the skill environment
-Complete the super-memory skill package installation on the new device. Refer to `skills/chroma-hybrid-search/SKILL.md`.
+Complete the deep-memory skill package installation on the new device. Refer to `skills/chroma-hybrid-search/SKILL.md`.
 
 #### Step 2: Run the restore script
 
-`--repo` defaults to the same **`super-memory-knowledge`** as `backup.py` — omit it unless you backed up under a custom name, in which case pass the same `--repo <name>` here too.
+`--repo` defaults to the same **`deep-memory-knowledge`** as `backup.py` — omit it unless you backed up under a custom name, in which case pass the same `--repo <name>` here too.
 
 **Safe mode (recommended) — only copies files that exist on GitHub but are missing locally; does not overwrite existing files:**
 ```bash

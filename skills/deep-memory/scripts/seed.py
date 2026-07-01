@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 seed.py
-首次安裝 super-memory 後，將預載種子知識庫（resources/seeds/）
+首次安裝 deep-memory 後，將預載種子知識庫（resources/seeds/）
 複製到使用者的 knowledge-base/ 目錄，作為初始知識基礎。
 
 種子來源：
@@ -45,7 +45,7 @@ def save_index(index_data, kb_index_path):
         json.dump(index_data, f, ensure_ascii=False, indent=2)
 
 def main():
-    parser = argparse.ArgumentParser(description="Seed initial knowledge base from super-memory bundled seeds")
+    parser = argparse.ArgumentParser(description="Seed initial knowledge base from deep-memory bundled seeds")
     parser.add_argument("--workspace", type=str, default=os.getcwd(),
                         help="工作目錄（knowledge-base/ 的父目錄），預設為當前目錄")
     parser.add_argument("--force", action="store_true",

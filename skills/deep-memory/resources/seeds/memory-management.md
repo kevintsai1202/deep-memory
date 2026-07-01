@@ -16,7 +16,7 @@
 | **Episodic Memory** | A record of a specific event or conversation, with time and context | "In 2024-03, the user fixed a Redis session issue" |
 | **Procedural Memory** | Operational skills, steps, and workflows | "The standard steps for deploying FastAPI" |
 
-**Mapping to super-memory:**
+**Mapping to deep-memory:**
 - Semantic memory → general-purpose category MD files in `knowledge-base/`
 - Episodic memory → raw records in the cold store, `cold-notes/raw.jsonl`
 - Procedural memory → skill operating steps in `experience/skill-*.md`
@@ -58,7 +58,7 @@ MemGPT (2023, Stanford) proposes a three-tier memory architecture:
 └──────────────────────────────────────┘
 ```
 
-**Mapping to super-memory:**
+**Mapping to deep-memory:**
 - Main Context = the current conversation turn
 - External Context = the hot store (`knowledge-base/*.md`, loaded after keyword matching)
 - External Storage = the cold store (`cold-notes/raw.jsonl` + ChromaDB, retrieved via RAG)
@@ -88,7 +88,7 @@ MemGPT (2023, Stanford) proposes a three-tier memory architecture:
 - **Clear memory boundaries**: memory entries should be stored as independent, atomic units rather than large blocks of text
 - **Cross-conversation consistency**: memory should stay consistent across different conversation threads, avoiding memory "amnesia"
 
-**How super-memory implements this:**
+**How deep-memory implements this:**
 - Active memory → proactive prompt at the end of a task in Step 5
 - User visibility → the reply explicitly states "I've read from the knowledge base: xxx.md"
 - Atomic storage → one `## 🔧` heading per entry

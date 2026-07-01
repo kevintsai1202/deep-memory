@@ -6,7 +6,7 @@ flowchart TD
 
     Extract["Step 1　抽取關鍵詞<br/>3~8 個核心詞，取前3個為 topic_fingerprint"] --> TopicSwitch{"Step 2　話題切換？<br/>轉折詞／關鍵詞差異≥40%／要求新分類"}
 
-    TopicSwitch --> SkillUsed{"Step 3　這輪用了<br/>非 super-memory 技能？"}
+    TopicSwitch --> SkillUsed{"Step 3　這輪用了<br/>非 deep-memory 技能？"}
 
     SkillUsed -->|否| NextStep4
     SkillUsed -->|是，已讀過| NextStep4

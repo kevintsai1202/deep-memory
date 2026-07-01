@@ -11,19 +11,19 @@
   <rect x="0" y="0" width="1040" height="680" fill="#FFFFFF"/>
 
   <!-- Title -->
-  <text x="520" y="26" text-anchor="middle" font-size="19" font-weight="700" fill="#111827">Super-Memory Architecture &amp; Data Flow</text>
-  <text x="520" y="46" text-anchor="middle" font-size="12" fill="#6B7280">super-memory (orchestrator) + chroma-hybrid-search (retrieval) + memory-backup (backup / restore)</text>
+  <text x="520" y="26" text-anchor="middle" font-size="19" font-weight="700" fill="#111827">Deep-Memory Architecture &amp; Data Flow</text>
+  <text x="520" y="46" text-anchor="middle" font-size="12" fill="#6B7280">deep-memory (orchestrator) + chroma-hybrid-search (retrieval) + memory-backup (backup / restore)</text>
 
   <!-- Row A: User/Agent -->
   <rect x="300" y="60" width="440" height="50" rx="10" fill="#F5F3FF" stroke="#8B5CF6" stroke-width="1.5"/>
   <text x="520" y="82" text-anchor="middle" font-size="14" font-weight="700" fill="#5B21B6">User &#8596; AI Agent</text>
-  <text x="520" y="100" text-anchor="middle" font-size="11" fill="#6B7280">Triggers super-memory every turn</text>
+  <text x="520" y="100" text-anchor="middle" font-size="11" fill="#6B7280">Triggers deep-memory every turn</text>
 
   <line x1="520" y1="110" x2="520" y2="138" stroke="#6B7280" stroke-width="2" marker-end="url(#arrow)"/>
 
-  <!-- Row B: super-memory orchestrator -->
+  <!-- Row B: deep-memory orchestrator -->
   <rect x="70" y="140" width="900" height="110" rx="10" fill="#EEF2FF" stroke="#4F46E5" stroke-width="1.5"/>
-  <text x="520" y="164" text-anchor="middle" font-size="15" font-weight="700" fill="#312E81">super-memory (orchestrator / lead skill)</text>
+  <text x="520" y="164" text-anchor="middle" font-size="15" font-weight="700" fill="#312E81">deep-memory (orchestrator / lead skill)</text>
   <text x="520" y="182" text-anchor="middle" font-size="11" fill="#6B7280">Self-Evolving Knowledge Core Loop &#183; runs every conversation turn</text>
   <text x="520" y="206" text-anchor="middle" font-size="12" fill="#374151">1 Extract keywords &#8594; 2 Detect topic switch &#8594; 3 Cross-skill experience lookup (mandatory)</text>
   <text x="520" y="226" text-anchor="middle" font-size="12" fill="#374151">&#8594; 4 Knowledge base retrieval (MD-first / RAG fallback) &#8594; 5 Task complete &#183; proactive recording</text>
@@ -87,5 +87,5 @@
   <text x="845" y="560" text-anchor="middle" font-size="10" fill="#6B7280">Portable &#183; cross-device sync</text>
 
   <!-- Footer -->
-  <text x="520" y="650" text-anchor="middle" font-size="11.5" fill="#9CA3AF">Super-Memory &#183; A self-evolving knowledge accumulation &amp; hybrid retrieval system</text>
+  <text x="520" y="650" text-anchor="middle" font-size="11.5" fill="#9CA3AF">Deep-Memory &#183; A self-evolving knowledge accumulation &amp; hybrid retrieval system</text>
 </svg>

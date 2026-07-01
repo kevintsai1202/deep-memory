@@ -1,6 +1,6 @@
 # Cold Store, Vectorization & Refinement Rules
 
-> super-memory/SKILL.md Step 5 already tells you, every turn, to write to the cold store by default — that decision doesn't require this file. Load this file on demand for the exact skip condition and write conventions below, or when the user asks about cold-notes / vectorization / refinement.
+> deep-memory/SKILL.md Step 5 already tells you, every turn, to write to the cold store by default — that decision doesn't require this file. Load this file on demand for the exact skip condition and write conventions below, or when the user asks about cold-notes / vectorization / refinement.
 
 ## Contents
 
@@ -71,7 +71,7 @@
 
 ## Reading the Cold Store: Through RAG, Not Directly
 
-Once `update_db.py` has vectorized the cold store, retrieve its content through `search.py` (super-memory Step 4, Path 2) exactly like any other indexed document — do not read `cold-notes/raw.jsonl` directly as a retrieval technique. A direct read doesn't rank or filter by relevance to the current question, and it doesn't scale as the file grows; it duplicates what RAG already does correctly, now that search.py's document set covers the cold store too.
+Once `update_db.py` has vectorized the cold store, retrieve its content through `search.py` (deep-memory Step 4, Path 2) exactly like any other indexed document — do not read `cold-notes/raw.jsonl` directly as a retrieval technique. A direct read doesn't rank or filter by relevance to the current question, and it doesn't scale as the file grows; it duplicates what RAG already does correctly, now that search.py's document set covers the cold store too.
 
 **The one exception is the refinement workflow below**, which reads `raw.jsonl` directly on purpose: it needs every entry's `tags`/`skill`/`date` fields to cluster them, and neither RAG's ranked-top-K-for-one-query model nor the vector index's metadata (which doesn't retain those fields) can support that.
 

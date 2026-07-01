@@ -1,24 +1,24 @@
-# Super-Memory: A Self-Evolving Knowledge Accumulation & Hybrid Retrieval System
+# Deep-Memory: A Self-Evolving Knowledge Accumulation & Hybrid Retrieval System
 
 **English** | [繁體中文](README.zh-TW.md)
 
 > 💡 **Project note**: This project is a deep refactor and rename of the original **[auto-skill](https://github.com/toolsai/auto-skill)** project. We restructured it into a minimal, modular open-source skill pack, decoupled "code" from "data," and integrated local ChromaDB hybrid retrieval with BGE-Reranker re-ranking.
 
-![Super-Memory Flow](assets/super-memory-flow.en.svg)
+![Deep-Memory Flow](assets/deep-memory-flow.en.svg)
 
 This skill turns your AI agent from a tool that forgets everything the moment a session ends into a self-evolving "second brain" that gets better the more you use it.
 
-Super-Memory is a meta-skill designed for AI assistants. It runs as a background knowledge system that automatically retrieves past experience during conversations, captures best practices, and — once a task succeeds — proactively writes the "successful approach" into your private knowledge base and indexes it, intelligently cutting down on token usage. You just keep working as usual; Super-Memory runs automatically in the background.
+Deep-Memory is a meta-skill designed for AI assistants. It runs as a background knowledge system that automatically retrieves past experience during conversations, captures best practices, and — once a task succeeds — proactively writes the "successful approach" into your private knowledge base and indexes it, intelligently cutting down on token usage. You just keep working as usual; Deep-Memory runs automatically in the background.
 
 ---
 
 ## Core Highlights
 
 ### 1. Genuinely Gets Stronger With Use
-Traditional agents reset to zero the moment a conversation ends. Super-Memory's Core Loop automatically checks a keyword index on every turn — if it recognizes a problem it has solved before, it directly recalls the "best solution" or "pitfall guide" from that time.
+Traditional agents reset to zero the moment a conversation ends. Deep-Memory's Core Loop automatically checks a keyword index on every turn — if it recognizes a problem it has solved before, it directly recalls the "best solution" or "pitfall guide" from that time.
 
 ### 2. Cross-Skill Memory
-Whenever you invoke another specific skill (coding, writing, drawing, etc.), Super-Memory automatically checks its skill experience store.
+Whenever you invoke another specific skill (coding, writing, drawing, etc.), Deep-Memory automatically checks its skill experience store.
 Example: when you invoke `remotion-video-gen`, it proactively reminds you: "Last time we worked on this, setting FPS to 30 caused audio/video desync — we recommend switching to 60."
 
 ### 3. Proactive Experience Capture
@@ -38,7 +38,7 @@ Integrates the `memory-backup` sub-skill: export your knowledge base and push it
 
 ## How It Works (The Loop)
 
-Super-Memory runs a disciplined 5-step loop on every conversation turn:
+Deep-Memory runs a disciplined 5-step loop on every conversation turn:
 
 1. **Keyword Fingerprinting**
    Extracts core keywords from the conversation to generate a topic fingerprint.
@@ -72,7 +72,7 @@ Super-Memory runs a disciplined 5-step loop on every conversation turn:
 ### 1) Skill Install Package (GitHub Release Pack)
 ```text
 skills/
-├── super-memory/
+├── deep-memory/
 │   ├── SKILL.md                 # Lead protocol and flow control
 │   ├── scripts/seed.py          # Installs the bundled seed knowledge base
 │   └── resources/                # Recording format & hot/cold rules (loaded on demand)
@@ -128,7 +128,7 @@ your-project/
    ```powershell
    python -m venv .venv
    .venv\Scripts\python -m pip install -r skills/chroma-hybrid-search/requirements.txt
-   .venv\Scripts\python skills/super-memory/scripts/seed.py
+   .venv\Scripts\python skills/deep-memory/scripts/seed.py
    .venv\Scripts\python skills/chroma-hybrid-search/scripts/update_db.py
    ```
 
@@ -136,7 +136,7 @@ your-project/
    ```bash
    python3 -m venv .venv
    .venv/bin/python -m pip install -r skills/chroma-hybrid-search/requirements.txt
-   .venv/bin/python skills/super-memory/scripts/seed.py
+   .venv/bin/python skills/deep-memory/scripts/seed.py
    .venv/bin/python skills/chroma-hybrid-search/scripts/update_db.py
    ```
 

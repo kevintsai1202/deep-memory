@@ -54,7 +54,7 @@ Hybrid search = fusing **keyword search (BM25) + vector search (Dense)** results
 - **BGE-Reranker-base model**: Well-suited to mixed Traditional Chinese/English corpora, with fast inference
 - **Avoid empty injection**: If all results fall below the threshold, tell the user directly that "no relevant records were found" instead of forcing in low-scoring content
 
-**super-memory configuration:**
+**deep-memory configuration:**
 ```bash
 # Use hybrid search + reranker, taking the Top-3 results
 # Windows:        .venv\Scripts\python skills/chroma-hybrid-search/scripts/search.py --query "question" --limit 3

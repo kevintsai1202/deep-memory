@@ -11,19 +11,19 @@
   <rect x="0" y="0" width="1040" height="680" fill="#FFFFFF"/>
 
   <!-- 標題 -->
-  <text x="520" y="26" text-anchor="middle" font-size="19" font-weight="700" fill="#111827">Super-Memory 架構與資料流</text>
-  <text x="520" y="46" text-anchor="middle" font-size="12" fill="#6B7280">super-memory（協調） + chroma-hybrid-search（檢索） + memory-backup（備份／還原）</text>
+  <text x="520" y="26" text-anchor="middle" font-size="19" font-weight="700" fill="#111827">Deep-Memory 架構與資料流</text>
+  <text x="520" y="46" text-anchor="middle" font-size="12" fill="#6B7280">deep-memory（協調） + chroma-hybrid-search（檢索） + memory-backup（備份／還原）</text>
 
   <!-- Row A: 使用者/Agent -->
   <rect x="300" y="60" width="440" height="50" rx="10" fill="#F5F3FF" stroke="#8B5CF6" stroke-width="1.5"/>
   <text x="520" y="82" text-anchor="middle" font-size="14" font-weight="700" fill="#5B21B6">使用者 ↔ AI Agent</text>
-  <text x="520" y="100" text-anchor="middle" font-size="11" fill="#6B7280">每輪對話觸發 super-memory</text>
+  <text x="520" y="100" text-anchor="middle" font-size="11" fill="#6B7280">每輪對話觸發 deep-memory</text>
 
   <line x1="520" y1="110" x2="520" y2="138" stroke="#6B7280" stroke-width="2" marker-end="url(#arrow)"/>
 
-  <!-- Row B: super-memory 主導技能 -->
+  <!-- Row B: deep-memory 主導技能 -->
   <rect x="70" y="140" width="900" height="110" rx="10" fill="#EEF2FF" stroke="#4F46E5" stroke-width="1.5"/>
-  <text x="520" y="164" text-anchor="middle" font-size="15" font-weight="700" fill="#312E81">super-memory（主導／協調技能）</text>
+  <text x="520" y="164" text-anchor="middle" font-size="15" font-weight="700" fill="#312E81">deep-memory（主導／協調技能）</text>
   <text x="520" y="182" text-anchor="middle" font-size="11" fill="#6B7280">Self-Evolving Knowledge Core Loop · 每輪對話執行</text>
   <text x="520" y="206" text-anchor="middle" font-size="12" fill="#374151">1 抽取關鍵詞 → 2 話題切換判斷 → 3 跨技能經驗讀取（強制）</text>
   <text x="520" y="226" text-anchor="middle" font-size="12" fill="#374151">→ 4 知識庫檢索（MD 優先／RAG 備援） → 5 任務完成・主動記錄</text>
@@ -87,5 +87,5 @@
   <text x="845" y="560" text-anchor="middle" font-size="10" fill="#6B7280">可攜式・跨裝置同步</text>
 
   <!-- Footer -->
-  <text x="520" y="650" text-anchor="middle" font-size="11.5" fill="#9CA3AF">Super-Memory · AI 自進化知識積累與混合檢索系統</text>
+  <text x="520" y="650" text-anchor="middle" font-size="11.5" fill="#9CA3AF">Deep-Memory · AI 自進化知識積累與混合檢索系統</text>
 </svg>

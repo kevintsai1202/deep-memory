@@ -109,10 +109,10 @@
 
 ---
 
-## 🔧 Integration Strategy: Importing Cross-Tool Memory into super-memory
+## 🔧 Integration Strategy: Importing Cross-Tool Memory into deep-memory
 
 **Date:** 2025-07-01
-**Context:** Integrating each tool's raw memory data into the super-memory knowledge base
+**Context:** Integrating each tool's raw memory data into the deep-memory knowledge base
 **Best Practices:**
 
 | Tool | Memory Format | Import Strategy |

@@ -1,6 +1,6 @@
 # Recording Criteria & Entry Format
 
-> Loaded on demand by super-memory/SKILL.md Step 5 when actually writing a knowledge-base or experience entry. Not needed for the core per-turn loop.
+> Loaded on demand by deep-memory/SKILL.md Step 5 when actually writing a knowledge-base or experience entry. Not needed for the core per-turn loop.
 
 ## Recording Criteria
 
@@ -24,7 +24,7 @@
 - ❌ Pure conceptual explanations (no concrete steps or decision criteria)
 - ❌ Conclusions without specific context that cannot be reproduced
 
-### Experience (non-super-memory skills)
+### Experience (non-deep-memory skills)
 
 **Should record:**
 - ✅ Pitfalls and solutions encountered while using the skill (including error messages / how to locate them)

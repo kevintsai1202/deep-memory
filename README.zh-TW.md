@@ -1,24 +1,24 @@
-# Super‑Memory：AI 自進化知識積累與混合檢索系統
+# Deep‑Memory：AI 自進化知識積累與混合檢索系統
 
 [English](README.md) | **繁體中文**
 
 > 💡 **專案說明**：本專案是由原 **[auto-skill](https://github.com/toolsai/auto-skill)** 專案深度優化與更名演進而來。我們將其重構為極簡且模組化的開源技能包，解耦了「代碼與資料」，並整合了本地 ChromaDB 混合檢索與 BGE-Reranker 重排能力。
 
-![Super‑Memory Flow](assets/super-memory-flow.svg)
+![Deep‑Memory Flow](assets/deep-memory-flow.svg)
 
 這個技能是讓你的 AI Agent 不再是「用完即忘」的工具，而是越用越懂你的自進化「第二大腦」。
 
-Super‑Memory 是一個為 AI Assistant 設計的元技能（Meta‑Skill）。它作為背景運行的知識系統，能在對話過程中自動檢索過往經驗、捕捉最佳實踐，並在任務成功時主動將「成功經驗」寫入你的私人知識庫並建立索引，聰明地減少 Tokens 消耗。你只需要照常提出需求，Super‑Memory 就會在背景自動運作。
+Deep‑Memory 是一個為 AI Assistant 設計的元技能（Meta‑Skill）。它作為背景運行的知識系統，能在對話過程中自動檢索過往經驗、捕捉最佳實踐，並在任務成功時主動將「成功經驗」寫入你的私人知識庫並建立索引，聰明地減少 Tokens 消耗。你只需要照常提出需求，Deep‑Memory 就會在背景自動運作。
 
 ---
 
 ## 核心亮點
 
 ### 1. 真正的「越用越強」
-傳統的 Agent 對話結束即歸零。Super‑Memory 透過核心循環（Core Loop），在每次對話中自動檢查關鍵字索引，若發現這是過去解決過的問題，會直接調用當時的「最佳解法」或「避坑指南」。
+傳統的 Agent 對話結束即歸零。Deep‑Memory 透過核心循環（Core Loop），在每次對話中自動檢查關鍵字索引，若發現這是過去解決過的問題，會直接調用當時的「最佳解法」或「避坑指南」。
 
 ### 2. 跨技能經驗層（Cross‑Skill Memory）
-當你呼叫其他特定 Skill（如 Coding、寫作、繪圖）時，Super‑Memory 會自動檢查技能經驗庫。
+當你呼叫其他特定 Skill（如 Coding、寫作、繪圖）時，Deep‑Memory 會自動檢查技能經驗庫。
 例如：當你調用 `remotion-video-gen` 時，它會主動提醒：「上次我們在做這個時，發現設定 FPS 30 會導致音畫不同步，建議改為 60。」
 
 ### 3. 主動式經驗捕獲
@@ -38,7 +38,7 @@ Super‑Memory 是一個為 AI Assistant 設計的元技能（Meta‑Skill）。
 
 ## 運作邏輯（The Loop）
 
-Super‑Memory 在每一輪對話中執行嚴謹的 5 步循環：
+Deep‑Memory 在每一輪對話中執行嚴謹的 5 步循環：
 
 1. **關鍵詞指紋 (Fingerprinting)**
    從對話中提取核心關鍵詞，生成話題指紋。
@@ -72,7 +72,7 @@ Super‑Memory 在每一輪對話中執行嚴謹的 5 步循環：
 ### 1) 技能安裝包 (GitHub Release Pack)
 ```text
 skills/
-├── super-memory/
+├── deep-memory/
 │   ├── SKILL.md                 # 主導協議與流程控制
 │   ├── scripts/seed.py          # 預載種子知識庫安裝
 │   └── resources/                # 記錄格式・冷熱庫規則（延伸文件，依需求載入）
@@ -128,7 +128,7 @@ your-project/
    ```powershell
    python -m venv .venv
    .venv\Scripts\python -m pip install -r skills/chroma-hybrid-search/requirements.txt
-   .venv\Scripts\python skills/super-memory/scripts/seed.py
+   .venv\Scripts\python skills/deep-memory/scripts/seed.py
    .venv\Scripts\python skills/chroma-hybrid-search/scripts/update_db.py
    ```
 
@@ -136,7 +136,7 @@ your-project/
    ```bash
    python3 -m venv .venv
    .venv/bin/python -m pip install -r skills/chroma-hybrid-search/requirements.txt
-   .venv/bin/python skills/super-memory/scripts/seed.py
+   .venv/bin/python skills/deep-memory/scripts/seed.py
    .venv/bin/python skills/chroma-hybrid-search/scripts/update_db.py
    ```
 

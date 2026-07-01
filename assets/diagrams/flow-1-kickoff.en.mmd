@@ -6,7 +6,7 @@ flowchart TD
 
     Extract["Step 1　Extract Keywords<br/>3-8 core terms; first 3 become topic_fingerprint"] --> TopicSwitch{"Step 2　Topic Switch?<br/>transition words／keyword diff≥40%／new-category request"}
 
-    TopicSwitch --> SkillUsed{"Step 3　Non-super-memory<br/>skill used this turn?"}
+    TopicSwitch --> SkillUsed{"Step 3　Non-deep-memory<br/>skill used this turn?"}
 
     SkillUsed -->|no| NextStep4
     SkillUsed -->|yes, already loaded| NextStep4

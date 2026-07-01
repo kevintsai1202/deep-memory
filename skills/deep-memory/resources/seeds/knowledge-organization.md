@@ -87,7 +87,7 @@ knowledge-base/
 
 experience/
 ├── _index.json             # Skill experience index (required)
-├── skill-super-memory.md   # Usage experience for super-memory itself
+├── skill-deep-memory.md   # Usage experience for deep-memory itself
 └── skill-[other-skill].md
 
 cold-notes/
