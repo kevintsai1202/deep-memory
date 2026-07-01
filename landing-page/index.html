@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="./support.js"></script>
+</head>
+
+<body>
+  <x-dc>
+    <helmet>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <!-- 引入 Inter 現代無襯線字體與 IBM Plex Mono 程式碼等寬字體 -->
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+      <style>
+        /* 設計系統 Token 定義 (CSS 變數) */
+        :root {
+          --bg-primary: #07080a;
+          /* 極致深灰背景色 */
+          --bg-secondary: #0c0e12;
+          /* 次要背景色 (卡片) */
+          --bg-hover: #12161c;
+          /* 懸停背景色 */
+          --border-color: rgba(255, 255, 255, 0.06);
+          /* 微弱的白框線 */
+          --border-hover: rgba(255, 255, 255, 0.15);
+          /* 懸停框線色 */
+          --text-primary: #f3f4f6;
+          /* 主要文字色 (近白) */
+          --text-secondary: #8e96a3;
+          /* 次要文字色 (中灰) */
+          --text-muted: #4e5564;
+          /* 暗灰文字色 (說明文字) */
+          --brand-color: #10b981;
+          /* 品牌亮色 (翡翠綠) */
+          --brand-glow: rgba(16, 185, 129, 0.15);
+          /* 品牌亮色陰影 */
+          --blue-color: #3b82f6;
+          /* 藍色高亮色 */
+          --timeline-connector: rgba(255, 255, 255, 0.22);
+          /* 時間軸垂直線色彩 */
+          --nav-bg: rgba(7, 8, 10, 0.85);
+          /* 導航列背景 */
+
+          --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          --font-mono: 'IBM Plex Mono', monospace;
+          --section-padding: 120px;
+          /* 符合 ui-ux-pro-max padding >= 112px 規範 */
+        }
+
+        /* 日間模式 (Light Mode) 覆蓋定義 */
+        html.light-mode {
+          --bg-primary: #f9fafb;
+          /* 淺灰白色底色 */
+          --bg-secondary: #ffffff;
+          /* 純白卡片底色 */
+          --bg-hover: #f3f4f6;
+          /* 次要懸停底色 */
+          --border-color: rgba(0, 0, 0, 0.08);
+          /* 淺灰色外框 */
+          --border-hover: rgba(0, 0, 0, 0.18);
+          --text-primary: #111827;
+          /* 深色文字 (Slate 900) */
+          --text-secondary: #4b5563;
+          /* 次要文字 (Slate 600) */
+          --text-muted: #9ca3af;
+          /* 暗灰文字 (Slate 400) */
+          --brand-color: #059669;
+          /* 稍深的翡翠綠，提高閱讀對比度 */
+          --brand-glow: rgba(5, 150, 105, 0.12);
+          --blue-color: #2563eb;
+          /* 亮藍色 */
+          --timeline-connector: rgba(0, 0, 0, 0.15);
+          --nav-bg: rgba(249, 250, 251, 0.85);
+        }
+
+        /* 日間模式特定元素覆蓋 */
+        html.light-mode .btn-primary {
+          background: #000000;
+          color: #ffffff;
+        }
+        html.light-mode .btn-primary:hover {
+          background: #222222;
+        }
+        html.light-mode .code-window {
+          background: #0c0e12 !important; /* 終端機維持暗色 */
+          box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.4) !important;
+          border-color: rgba(0, 0, 0, 0.15) !important;
+        }
+
+        body {
+          margin: 0;
+          background: var(--bg-primary);
+          color: var(--text-primary);
+          font-family: var(--font-sans);
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
+
+        * {
+          box-sizing: border-box;
+        }
+
+        /* 等寬字體樣式 */
+        .mono {
+          font-family: var(--font-mono);
+        }
+
+        /* 動態呼吸燈效果 (用於狀態指示) */
+        @keyframes pulse {
+
+          0%,
+          100% {
+            opacity: 0.4;
+          }
+
+          50% {
+            opacity: 1;
+          }
+        }
+
+        /* 微浮動效果 (用於 Hero 卡片) */
+        @keyframes float {
+
+          0%,
+          100% {
+            transform: translateY(0);
+          }
+
+          50% {
+            transform: translateY(-6px);
+          }
+        }
+
+        /* SVG 資料流向動畫效果 */
+        @keyframes flow-forward {
+          to {
+            stroke-dashoffset: -20;
+          }
+        }
+
+        .flow-path {
+          stroke-dasharray: 6 6;
+          animation: flow-forward 2s linear infinite;
+        }
+
+        /* 頂部導航列懸停效果 */
+        .nav-link {
+          color: var(--text-secondary);
+          text-decoration: none;
+          font-size: 14px;
+          font-weight: 500;
+          transition: color 0.2s ease;
+        }
+
+        .nav-link:hover {
+          color: var(--text-primary);
+        }
+
+        /* Stark 現代按鈕樣式 */
+        .btn-primary {
+          background: #ffffff;
+          color: #000000;
+          padding: 14px 28px;
+          border-radius: 6px;
+          font-weight: 600;
+          font-size: 15px;
+          text-decoration: none;
+          border: 1px solid #ffffff;
+          transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+        }
+
+        .btn-primary:hover {
+          background: transparent;
+          color: #ffffff;
+          border-color: #ffffff;
+        }
+
+        .btn-secondary {
+          background: transparent;
+          border: 1px solid var(--border-color);
+          color: var(--text-primary);
+          padding: 14px 28px;
+          border-radius: 6px;
+          font-weight: 600;
+          font-size: 15px;
+          text-decoration: none;
+          transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+          background: rgba(255, 255, 255, 0.03);
+          border-color: var(--border-hover);
+        }
+
+        /* 卡片基本樣式 */
+        .card {
+          background: var(--bg-secondary);
+          border: 1px solid var(--border-color);
+          border-radius: 12px;
+          padding: 32px;
+          transition: border-color 0.2s ease, background-color 0.2s ease;
+        }
+
+        .card:hover {
+          border-color: var(--border-hover);
+          background: var(--bg-hover);
+        }
+
+        /* 圖示容器樣式 */
+        .icon-wrapper {
+          width: 36px;
+          height: 36px;
+          border-radius: 8px;
+          background: rgba(16, 185, 129, 0.08);
+          border: 1px solid rgba(16, 185, 129, 0.15);
+          color: var(--brand-color);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 8px;
+        }
+
+        /* Bento Grid (非對稱網格，打破均等三欄反模式) */
+        .bento-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 24px;
+        }
+
+        .span-1 {
+          grid-column: span 1;
+        }
+
+        .span-2 {
+          grid-column: span 2;
+        }
+
+        /* 響應式斷點設定 */
+        @media (max-width: 960px) {
+          .bento-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .span-2,
+          .span-1 {
+            grid-column: span 1;
+          }
+
+          .hero-title {
+            font-size: 44px !important;
+          }
+
+          .nav-bar {
+            padding: 20px 24px !important;
+          }
+
+          .section {
+            padding: 80px 24px !important;
+          }
+        }
+      </style>
+    </helmet>
+
+    <div style="background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; overflow-x: hidden;">
+
+      <!-- 頂部導航列 (Nav) -->
+      <div class="nav-bar"
+        style="display: flex; align-items: center; justify-content: space-between; padding: 24px 64px; position: sticky; top: 0; z-index: 100; background: var(--nav-bg); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border-color);">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <!-- 替換 Emoji 為專業向量 SVG Brain 圖示 -->
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-color);">
+            <path
+              d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1 0-3.12 3 3 0 0 1 0-3.88 2.5 2.5 0 0 1 0-3.12A2.5 2.5 0 0 1 9.5 2Z" />
+            <path
+              d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 0-3.12 3 3 0 0 0 0-3.88 2.5 2.5 0 0 0 0-3.12A2.5 2.5 0 0 0 14.5 2Z" />
+          </svg>
+          <span style="font-weight: 700; font-size: 18px; letter-spacing: -0.02em;">{{t.brand}}</span>
+        </div>
+        <div style="display: flex; gap: 24px; align-items: center;">
+          <a href="#how" class="nav-link">{{t.nav_timeline}}</a>
+          <a href="#features" class="nav-link">{{t.nav_features}}</a>
+          <a href="#structure" class="nav-link">{{t.nav_pricing}}</a>
+          
+          <div style="display: flex; gap: 8px; align-items: center; border-left: 1px solid var(--border-color); padding-left: 16px; margin-left: 8px;">
+            <!-- Language toggle -->
+            <button onclick="{{toggleLang}}" class="mono" style="background: none; border: 1px solid var(--border-color); color: var(--text-secondary); padding: 5px 9px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: 600; text-transform: uppercase;">
+              {{lang === 'zh' ? 'EN' : '繁體'}}
+            </button>
+            <!-- Theme toggle -->
+            <button onclick="{{toggleTheme}}" style="background: none; border: 1px solid var(--border-color); color: var(--text-secondary); padding: 5px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+              <sc-if value="{{theme === 'dark'}}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+              </sc-if>
+              <sc-if value="{{theme === 'light'}}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              </sc-if>
+            </button>
+          </div>
+
+          <a href="https://github.com/kevintsai1202/deep-memory" class="btn-secondary"
+            style="padding: 8px 16px; font-size: 13px; text-decoration: none;">View on GitHub</a>
+        </div>
+      </div>
+
+      <!-- 英雄展示區 (Hero Section) -->
+      <div class="section"
+        style="max-width: 1100px; margin: 0 auto; padding: 140px 32px 100px; text-align: center; position: relative;">
+        <!-- 極致細微的背景擴散，非濫用 glassmorphism 或彩色陰影 -->
+        <div
+          style="position: absolute; top: -120px; left: 50%; transform: translateX(-50%); width: 700px; height: 400px; background: radial-gradient(ellipse at center, rgba(16, 185, 129, 0.05), transparent 70%); pointer-events: none;">
+        </div>
+
+        <div class="mono"
+          style="display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.18); color: var(--brand-color); padding: 6px 14px; border-radius: 20px; font-size: 13px; margin-bottom: 32px;">
+          <span
+            style="width: 6px; height: 6px; border-radius: 50%; background: var(--brand-color); animation: pulse 2s infinite;"></span>
+          {{t.hero_badge}}
+        </div>
+
+        <h1 class="hero-title"
+          style="font-size: 64px; line-height: 1.1; font-weight: 700; letter-spacing: -0.03em; margin: 0 0 24px; background: linear-gradient(180deg, var(--text-primary), var(--text-muted)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">
+          {{t.hero_title}}<br />
+          <span style="background: linear-gradient(135deg, var(--brand-color), var(--blue-color)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">{{t.hero_title_highlight}}</span>
+        </h1>
+
+        <p
+          style="font-size: 19px; line-height: 1.6; color: var(--text-secondary); max-width: 640px; margin: 0 auto 44px;">
+          {{t.hero_desc}}
+        </p>
+
+        <div style="display: flex; gap: 16px; justify-content: center; margin-bottom: 64px;">
+          <a href="https://github.com/kevintsai1202/deep-memory" class="btn-primary" style="text-decoration: none;">{{t.hero_btn_github}}</a>
+          <a href="#how" class="btn-secondary" style="text-decoration: none;">{{t.hero_btn_see_how}}</a>
+        </div>
+
+        <!-- 亮點標籤 -->
+        <div style="display: flex; justify-content: center; gap: 40px; flex-wrap: wrap;">
+          <div class="mono"
+            style="color: var(--text-muted); font-size: 13px; display: flex; align-items: center; gap: 8px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              style="color: var(--brand-color);">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+            </svg>
+            {{t.hero_highlight_1}}
+          </div>
+          <div class="mono"
+            style="color: var(--text-muted); font-size: 13px; display: flex; align-items: center; gap: 8px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              style="color: var(--brand-color);">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            {{t.hero_highlight_2}}
+          </div>
+          <div class="mono"
+            style="color: var(--text-muted); font-size: 13px; display: flex; align-items: center; gap: 8px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              style="color: var(--brand-color);">
+              <path
+                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+            </svg>
+            {{t.hero_highlight_3}}
+          </div>
+        </div>
+
+        <!-- 終端機 Mockup 元件 (作為 Hero 中心主視覺) -->
+        <div class="code-window"
+          style="margin-top: 80px; text-align: left; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 30px 60px -15px rgba(0,0,0,0.8); max-width: 800px; margin-left: auto; margin-right: auto; overflow: hidden; animation: float 6s ease-in-out infinite;">
+          <div
+            style="background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border-color); padding: 12px 18px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; gap: 6px;">
+              <span
+                style="width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.15); display: inline-block;"></span>
+              <span
+                style="width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.15); display: inline-block;"></span>
+              <span
+                style="width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.15); display: inline-block;"></span>
+            </div>
+            <div class="mono" style="font-size: 11px; color: var(--text-muted); letter-spacing: 0.05em;">
+              deep-memory-terminal</div>
+            <div style="width: 36px;"></div>
+          </div>
+          <div class="mono"
+            style="padding: 24px; font-size: 13.5px; line-height: 1.6; color: #dfe3e7; overflow-x: auto;">
+            <div style="color: var(--text-muted); margin-bottom: 8px;"># Initialize query using local hybrid search
+            </div>
+            <div style="margin-bottom: 8px;"><span style="color: var(--brand-color);">$</span> <span
+                style="color: var(--text-primary);">python skills/chroma-hybrid-search/scripts/search.py --query
+                "refactor auto-skill"</span></div>
+            <div style="color: #60a5fa; margin-bottom: 4px;">[Search] Running ChromaDB + BM25 retrieve... done</div>
+            <div style="color: var(--text-secondary); margin-bottom: 12px;">[Match] Injected 1 experience record into AI
+              Agent:</div>
+            <div
+              style="background: rgba(16, 185, 129, 0.04); border-left: 2px solid var(--brand-color); padding: 10px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px;">
+              <span style="color: var(--brand-color); font-weight: 600;">experience/skill-auto-skill.md</span><br />
+              <span style="color: var(--text-secondary); font-size: 12.5px;">- Critical: governing path resolution on
+                Windows vs Linux environments</span>
+            </div>
+            <div style="color: var(--brand-color); margin-bottom: 8px;"><span
+                style="color: var(--text-muted);">&gt;&gt;</span> Core context loaded successfully. Memory synced.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 特色功能 Bento Grid (Features Section) -->
+      <div id="features" class="section"
+        style="max-width: 1180px; margin: 0 auto; padding: var(--section-padding) 32px;">
+        <div style="text-align: center; margin-bottom: 64px;">
+          <div class="mono"
+            style="color: var(--brand-color); font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px;">
+            {{t.features_badge}}</div>
+          <h2 style="font-size: 38px; font-weight: 700; letter-spacing: -0.02em; margin: 0;">{{t.features_title}}</h2>
+          <p style="color: var(--text-secondary); font-size: 15.5px; margin: 12px 0 0 0;">{{t.features_desc}}</p>
+        </div>
+
+        <div class="bento-grid">
+          <!-- Card 1: Spans 2 columns -->
+          <div class="card span-2"
+            style="display: flex; flex-direction: column; justify-content: space-between; min-height: 320px;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+                <div class="icon-wrapper">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg>
+                </div>
+                <h3 style="font-weight: 600; font-size: 18px; margin: 0; color: var(--text-primary);">{{t.features_card1_title}}</h3>
+              </div>
+              <p style="color: var(--text-secondary); font-size: 14.5px; line-height: 1.6; margin: 0 0 24px 0;">
+                {{t.features_card1_desc}}
+              </p>
+            </div>
+            <!-- 視覺模擬：更新 Markdown 檔案 -->
+            <div
+              style="background: var(--bg-primary); border: 1px solid rgba(255,255,255,0.03); border-radius: 8px; padding: 16px; font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary);">
+              <div
+                style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px; margin-bottom: 8px;">
+                <span style="color: var(--text-muted);">knowledge-base/frontend-dev.md</span>
+                <span style="color: var(--brand-color);">+ Modified</span>
+              </div>
+              <div style="color: #f87171;">- padding: 24px; // Banned inline spacing</div>
+              <div style="color: #34d399;">+ padding: var(--section-padding); // Follow UI-UX-Pro-Max standard</div>
+            </div>
+          </div>
+
+          <!-- Card 2: Spans 1 column -->
+          <div class="card span-1"
+            style="display: flex; flex-direction: column; justify-content: space-between; min-height: 320px;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+                <div class="icon-wrapper">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path
+                      d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                </div>
+                <h3 style="font-weight: 600; font-size: 18px; margin: 0; color: var(--text-primary);">{{t.features_card2_title}}</h3>
+              </div>
+              <p style="color: var(--text-secondary); font-size: 14.5px; line-height: 1.6; margin: 0 0 24px 0;">
+                {{t.features_card2_desc}}
+              </p>
+            </div>
+            <!-- 踩坑警告區塊 -->
+            <div
+              style="background: rgba(239, 68, 68, 0.04); border: 1px solid rgba(239, 68, 68, 0.12); border-radius: 8px; padding: 12px 16px; font-family: var(--font-mono); font-size: 11.5px; color: #f87171; line-height: 1.4;">
+              <div style="font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                <span
+                  style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #ef4444;"></span>
+                PITFALL (gcp-spark)
+              </div>
+              Always specify --region when running Dataproc Serverless batches to avoid default zone billing.
+            </div>
+          </div>
+
+          <!-- Card 3: Spans 1 column (本機 RAG 搜尋) -->
+          <div class="card span-1"
+            style="display: flex; flex-direction: column; justify-content: space-between; min-height: 320px;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+                <div class="icon-wrapper">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </div>
+                <h3 style="font-weight: 600; font-size: 18px; margin: 0; color: var(--text-primary);">{{t.features_card3_title}}</h3>
+              </div>
+              <p style="color: var(--text-secondary); font-size: 14.5px; line-height: 1.6; margin: 0 0 24px 0;">
+                {{t.features_card3_desc}}
+              </p>
+            </div>
+            <!-- 本機 RAG 設定示範 -->
+            <div
+              style="background: var(--bg-primary); border: 1px solid rgba(255,255,255,0.03); border-radius: 8px; padding: 12px 16px; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); line-height: 1.5;">
+              <span style="color: var(--brand-color);">Local RAG Engine:</span> ChromaDB + BM25<br />
+              <span style="color: #60a5fa;">Reranker:</span> CPU SentenceTransformers<br />
+              <span style="color: var(--text-muted);">100% Private &amp; Offline Ready</span>
+            </div>
+          </div>
+
+          <!-- Card 4: Spans 2 columns (跨系統安全備份) -->
+          <div class="card span-2"
+            style="display: flex; flex-direction: column; justify-content: space-between; min-height: 320px;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+                <div class="icon-wrapper">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 2v6h-6" />
+                    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                    <path d="M3 22v-6h6" />
+                    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                  </svg>
+                </div>
+                <h3 style="font-weight: 600; font-size: 18px; margin: 0; color: var(--text-primary);">{{t.features_card4_title}}</h3>
+              </div>
+              <p style="color: var(--text-secondary); font-size: 14.5px; line-height: 1.6; margin: 0 0 24px 0;">
+                {{t.features_card4_desc}}
+              </p>
+            </div>
+            <!-- 同步程式碼區塊 -->
+            <div
+              style="background: var(--bg-primary); border: 1px solid rgba(255,255,255,0.03); border-radius: 8px; padding: 14px 18px; font-family: var(--font-mono); font-size: 12.5px;">
+              <span style="color: var(--text-muted);"># Push local updates to private repo</span><br />
+              <span style="color: var(--brand-color);">$</span> python skills/memory-backup/scripts/backup.py<br />
+              <span style="color: #60a5fa;">[Sync] Pushing to github.com/user/deep-memory-knowledge... done.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Architecture Section -->
+      <div id="architecture" class="section section-border" style="max-width: 1100px; margin: 0 auto; padding: var(--section-padding) 32px; border-top: 1px solid var(--border-color);">
+        <div style="text-align: center; margin-bottom: 64px;">
+          <div class="mono" style="color: var(--brand-color); font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px;">{{t.arch_badge}}</div>
+          <h2 style="font-size: 38px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 16px;">{{t.arch_title}}</h2>
+          <p style="color: var(--text-secondary); font-size: 16px; max-width: 580px; margin: 0 auto; line-height: 1.6;">{{t.arch_desc}}</p>
+        </div>
+        
+        <!-- Architecture Diagram SVG -->
+        <div style="display: flex; justify-content: center; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 16px; padding: 48px 24px; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.5); overflow-x: auto;">
+          <svg viewBox="0 0 820 380" width="100%" height="auto" style="max-width: 820px; color: var(--text-primary); min-width: 700px;">
+            <defs>
+              <!-- Background grid pattern -->
+              <pattern id="grid" width="25" height="25" patternUnits="userSpaceOnUse">
+                <path d="M 25 0 L 0 0 0 25" fill="none" stroke="rgba(255, 255, 255, 0.03)" stroke-width="1" />
+              </pattern>
+              
+              <!-- Glow Filters -->
+              <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#10b981" flood-opacity="0.4" />
+              </filter>
+              <filter id="glow-blue" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#3b82f6" flood-opacity="0.4" />
+              </filter>
+              <filter id="glow-white" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#ffffff" flood-opacity="0.15" />
+              </filter>
+
+              <!-- Arrow Markers -->
+              <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 2 L 6 5 L 0 8 z" fill="rgba(255,255,255,0.85)"/>
+              </marker>
+              <marker id="arrow-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 2 L 6 5 L 0 8 z" fill="#10b981"/>
+              </marker>
+              <marker id="arrow-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 2 L 6 5 L 0 8 z" fill="#3b82f6"/>
+              </marker>
+
+              <!-- Gradients -->
+              <linearGradient id="grad-green" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="rgba(16, 185, 129, 0.15)" />
+                <stop offset="100%" stop-color="rgba(16, 185, 129, 0.03)" />
+              </linearGradient>
+              <linearGradient id="grad-blue" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="rgba(59, 130, 246, 0.15)" />
+                <stop offset="100%" stop-color="rgba(59, 130, 246, 0.03)" />
+              </linearGradient>
+              <linearGradient id="grad-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="rgba(30, 41, 59, 0.6)" />
+                <stop offset="100%" stop-color="rgba(15, 23, 42, 0.8)" />
+              </linearGradient>
+            </defs>
+
+            <!-- Grid Background -->
+            <rect width="100%" height="100%" fill="url(#grid)" rx="8" />
+
+            <!-- Input Box (AI Agent / IDE) -->
+            <rect x="20" y="150" width="160" height="80" rx="8" fill="url(#grad-dark)" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" filter="url(#glow-white)" />
+            <text x="100" y="190" text-anchor="middle" font-size="14" font-weight="600" fill="var(--text-primary)">{{t.arch_agent}}</text>
+            <text x="100" y="210" text-anchor="middle" font-size="11" font-family="var(--font-mono)" fill="var(--text-secondary)">{{t.arch_agent_sub}}</text>
+
+            <!-- Line: Input -> Core -->
+            <path d="M 180 190 L 242 190" stroke="rgba(255,255,255,0.5)" stroke-width="2" class="flow-path" marker-end="url(#arrow)" />
+
+            <!-- Core Logic Engine (deep-memory) -->
+            <rect x="250" y="150" width="160" height="80" rx="8" fill="url(#grad-green)" stroke="#10b981" stroke-width="2" filter="url(#glow-green)" />
+            <text x="330" y="190" text-anchor="middle" font-size="14" font-weight="600" fill="var(--brand-color)">deep-memory</text>
+            <text x="330" y="210" text-anchor="middle" font-size="11" font-family="var(--font-mono)" fill="var(--text-secondary)">{{t.arch_loop_sub}}</text>
+
+            <!-- Local Memory Group Bounding Box (Enclosing Hot, Cold, and RAG) -->
+            <rect x="450" y="30" width="220" height="320" rx="12" fill="rgba(16, 185, 129, 0.01)" stroke="rgba(16, 185, 129, 0.3)" stroke-width="1.5" stroke-dasharray="4 4" />
+            <text x="560" y="20" text-anchor="middle" font-size="11" font-weight="600" fill="var(--brand-color)" letter-spacing="0.05em">{{t.arch_group_label}}</text>
+
+            <!-- Hot Store Card -->
+            <rect x="480" y="50" width="160" height="65" rx="6" fill="url(#grad-dark)" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" />
+            <text x="560" y="80" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text-primary)">{{t.arch_hot}}</text>
+            <text x="560" y="98" text-anchor="middle" font-size="10" font-family="var(--font-mono)" fill="rgba(255,255,255,0.6)">{{t.arch_hot_sub}}</text>
+
+            <!-- Line: Cold -> Hot (Refinement Process) -->
+            <path d="M 560 150 L 560 123" stroke="#10b981" stroke-width="2" class="flow-path" marker-end="url(#arrow-green)" />
+            <text x="570" y="140" font-size="10" font-family="var(--font-mono)" fill="#10b981" font-weight="600">{{t.arch_refine}}</text>
+
+            <!-- Cold Store Card -->
+            <rect x="480" y="150" width="160" height="65" rx="6" fill="url(#grad-dark)" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" />
+            <text x="560" y="180" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text-primary)">{{t.arch_cold}}</text>
+            <text x="560" y="198" text-anchor="middle" font-size="10" font-family="var(--font-mono)" fill="rgba(255,255,255,0.6)">{{t.arch_cold_sub}}</text>
+
+            <!-- Line: Cold -> Local RAG (Vectorization) -->
+            <path d="M 560 215 L 560 252" stroke="#3b82f6" stroke-width="2" class="flow-path" marker-end="url(#arrow-blue)" />
+            <text x="570" y="240" font-size="10" font-family="var(--font-mono)" fill="#3b82f6" font-weight="600">{{t.arch_vectorize}}</text>
+
+            <!-- Local RAG Hybrid Search Engine -->
+            <rect x="480" y="260" width="160" height="65" rx="6" fill="url(#grad-blue)" stroke="#3b82f6" stroke-width="2" filter="url(#glow-blue)" />
+            <text x="560" y="290" text-anchor="middle" font-size="13" font-weight="600" fill="#60a5fa">{{t.arch_rag}}</text>
+            <text x="560" y="308" text-anchor="middle" font-size="10" font-family="var(--font-mono)" fill="rgba(96, 165, 250, 0.8)">{{t.arch_rag_sub}}</text>
+
+            <!-- Lines: Core -> Local Memory System -->
+            <!-- Core -> Hot Store -->
+            <path d="M 390 170 Q 430 110 472 90" stroke="#10b981" stroke-width="2" fill="none" class="flow-path" marker-end="url(#arrow-green)" />
+            <text x="430" y="112" font-size="9" font-family="var(--font-mono)" fill="var(--brand-color)" font-weight="600">{{t.arch_task_end}}</text>
+            
+            <!-- Core -> Cold Store -->
+            <path d="M 390 190 L 472 190" stroke="rgba(255,255,255,0.5)" stroke-width="2" fill="none" class="flow-path" marker-end="url(#arrow)" />
+            <text x="430" y="182" font-size="9" font-family="var(--font-mono)" fill="var(--text-secondary)">{{t.arch_every_turn}}</text>
+
+            <!-- Core <-> Local RAG Search -->
+            <path d="M 390 210 Q 430 270 472 290" stroke="rgba(255,255,255,0.5)" stroke-width="2" fill="none" class="flow-path" marker-end="url(#arrow)" />
+            <path d="M 480 292 Q 400 292 330 232" stroke="rgba(255,255,255,0.5)" stroke-width="2" fill="none" class="flow-path" marker-end="url(#arrow)" />
+            <text x="405" y="258" font-size="9" font-family="var(--font-mono)" fill="var(--text-secondary)">{{t.arch_query_feed}}</text>
+
+            <!-- Lines: Stores -> Backup Sync -->
+            <path d="M 640 82 Q 700 82 712 150" stroke="rgba(255,255,255,0.5)" stroke-width="2" fill="none" class="flow-path" marker-end="url(#arrow)" />
+            <path d="M 640 182 Q 700 182 712 210" stroke="rgba(255,255,255,0.5)" stroke-width="2" fill="none" class="flow-path" marker-end="url(#arrow)" />
+
+            <!-- Remote GitHub Storage (Cloud Backup) -->
+            <rect x="720" y="120" width="80" height="140" rx="8" fill="url(#grad-dark)" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" />
+            <text x="760" y="165" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text-primary)">{{t.arch_github_top}}</text>
+            <text x="760" y="185" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text-primary)">{{t.arch_github_bottom}}</text>
+            <text x="760" y="205" text-anchor="middle" font-size="10" font-family="var(--font-mono)" fill="rgba(255,255,255,0.6)">{{t.arch_github_sub}}</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- 五步循環 (How it works - Vertical Timeline Flow) -->
+      <div id="how" class="section section-border"
+        style="background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent); border-top: 1px solid var(--border-color); padding: var(--section-padding) 32px;">
+        <div style="max-width: 800px; margin: 0 auto;">
+          <div style="text-align: center; margin-bottom: 72px;">
+            <div class="mono"
+              style="color: var(--brand-color); font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px;">
+              {{t.timeline_badge}}</div>
+            <h2 style="font-size: 38px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 16px;">{{t.timeline_title}}</h2>
+            <p
+              style="color: var(--text-secondary); font-size: 16px; max-width: 560px; margin: 0 auto; line-height: 1.6;">
+              {{t.timeline_desc}}</p>
+          </div>
+
+          <!-- 垂直時間軸 -->
+          <div style="display: flex; flex-direction: column; gap: 0;">
+            <sc-for list="{{steps}}" as="step">
+              <div style="display: flex; gap: 24px;">
+                <div style="display: flex; flex-direction: column; align-items: center;">
+                  <div class="mono"
+                    style="flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.45); color: var(--brand-color); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px;">
+                    {{step.n}}</div>
+                  <sc-if value="{{step.n !== '05'}}">
+                    <div style="width: 1px; flex-grow: 1; background: var(--timeline-connector); margin: 12px 0;"></div>
+                  </sc-if>
+                </div>
+                <div style="padding-bottom: {{step.n !== '05' ? '40px' : '0px'}}; flex-grow: 1;">
+                  <h4 style="font-size: 17px; font-weight: 600; margin: 0 0 8px 0; color: var(--text-primary);">{{step.title}}</h4>
+                  <p style="color: var(--text-secondary); font-size: 14.5px; line-height: 1.6; margin: 0;">{{step.desc}}</p>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <!-- 冷熱資料分層 (Structure Section) -->
+      <div id="structure" class="section"
+        style="max-width: 1180px; margin: 0 auto; padding: var(--section-padding) 32px;">
+        <div style="text-align: center; margin-bottom: 64px;">
+          <div class="mono"
+            style="color: var(--brand-color); font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px;">
+            {{t.storage_badge}}</div>
+          <h2 style="font-size: 38px; font-weight: 700; letter-spacing: -0.02em; margin: 0;">{{t.storage_title}}</h2>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+
+          <!-- Cold Store 卡片 -->
+          <div class="card"
+            style="position: relative; display: flex; flex-direction: column; justify-content: space-between; min-height: 260px;">
+            <div>
+              <div class="mono"
+                style="color: var(--text-muted); font-size: 11px; margin-bottom: 16px; display: flex; align-items: center; gap: 6px;">
+                <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted);"></span>
+                {{t.storage_card_cold_tag}}
+              </div>
+              <h3 style="font-size: 20px; font-weight: 600; margin: 0 0 12px 0; color: var(--text-primary);">{{t.storage_card_cold_title}}</h3>
+              <p style="color: var(--text-secondary); font-size: 14.5px; line-height: 1.6; margin: 0 0 24px 0;">
+                {{t.storage_card_cold_desc}}
+              </p>
+            </div>
+            <div
+              style="background: var(--bg-primary); border: 1px solid rgba(255,255,255,0.03); border-radius: 8px; padding: 12px; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
+              {"topic": "setup spark", "content": "used uv... finished with region us-central1", "timestamp":
+              1782839201}
+            </div>
+          </div>
+
+          <!-- Hot Store 卡片 (突出顯示) -->
+          <div class="card"
+            style="border-color: rgba(16, 185, 129, 0.2); position: relative; display: flex; flex-direction: column; justify-content: space-between; min-height: 260px;">
+            <div
+              style="position: absolute; top: -1px; left: 32px; right: 32px; height: 1px; background: linear-gradient(90deg, transparent, var(--brand-color), transparent);">
+            </div>
+            <div>
+              <div class="mono"
+                style="color: var(--brand-color); font-size: 11px; margin-bottom: 16px; display: flex; align-items: center; gap: 6px;">
+                <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--brand-color);"></span>
+                {{t.storage_card_hot_tag}}
+              </div>
+              <h3 style="font-size: 20px; font-weight: 600; margin: 0 0 12px 0; color: var(--text-primary);">{{t.storage_card_hot_title}}</h3>
+              <p style="color: var(--text-secondary); font-size: 14.5px; line-height: 1.6; margin: 0 0 24px 0;">
+                {{t.storage_card_hot_desc}}
+              </p>
+            </div>
+            <div
+              style="background: var(--bg-primary); border: 1px solid rgba(16, 185, 129, 0.1); border-radius: 8px; padding: 12px; font-family: var(--font-mono); font-size: 11px; color: var(--brand-color); display: flex; justify-content: space-between; align-items: center;">
+              <span>knowledge-base/gcp-spark.md</span>
+              <span
+                style="font-size: 10px; background: rgba(16, 185, 129, 0.1); padding: 2px 6px; border-radius: 4px;">{{t.storage_card_hot_status}}</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 行動呼籲區 (CTA Section) -->
+      <div class="section"
+        style="max-width: 960px; margin: 0 auto; padding: var(--section-padding) 32px 140px; text-align: center;">
+        <div
+          style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 20px; padding: 64px 40px; position: relative; overflow: hidden;">
+          <h2 style="font-size: 34px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 16px;">{{t.cta_title}}</h2>
+          <p style="color: var(--text-secondary); font-size: 16px; margin: 0 0 36px;">{{t.cta_desc}}</p>
+          <a href="https://github.com/kevintsai1202/deep-memory"
+            class="btn-primary" style="text-decoration: none;">github.com/kevintsai1202/deep-memory</a>
+        </div>
+      </div>
+
+      <!-- 頁尾 (Footer) -->
+      <div
+        style="border-top: 1px solid var(--border-color); padding: 32px 64px; display: flex; justify-content: space-between; color: var(--text-muted); font-size: 13px;">
+        <span>{{t.footer_license}}</span>
+        <span>{{t.footer_desc}}</span>
+      </div>
+
+    </div>
+
+  </x-dc>
+  <script type="text/x-dc" data-dc-script>
+// Translation Dictionary
+const T = {
+  zh: {
+    brand: "Deep-Memory",
+    nav_features: "功能特性",
+    nav_arch: "系統架構",
+    nav_timeline: "運行機制",
+    nav_pricing: "儲存架構",
+    
+    hero_badge: "深色/翡翠綠主題優化 · 基於 UI/UX PRO MAX",
+    hero_title: "讓 AI Agent 擁有自我演進的",
+    hero_title_highlight: "終身記憶體",
+    hero_desc: "本機優先的 CLI 知識庫系統。靜默運行於背景，自動分析每一次與 Agent 的對話，將有價值的開發實踐沉澱為結構化知識，防止重複踩坑。",
+    hero_btn_github: "前往 GitHub 倉庫",
+    hero_btn_see_how: "查看運行機制",
+    hero_highlight_1: "基於 auto-skill 深度重構",
+    hero_highlight_2: "本機 ChromaDB 混合檢索",
+    hero_highlight_3: "跨平台 GitHub 備份",
+    
+    features_badge: "Features",
+    features_title: "更聰明、更流暢的開發流",
+    features_desc: "不加干擾，主動演進。在您編碼時默默記錄一切。",
+    
+    features_card1_tag: "Self-Evolving",
+    features_card1_title: "越用越強的記憶循環",
+    features_card1_desc: "每回合自動分析對話關鍵字與主題。當偵測到您正在使用特定工具或遇到已知問題時，主動載入過去踩坑紀錄與最佳實踐參數，防止重複開發。",
+    
+    features_card2_tag: "Cross-Skill",
+    features_card2_title: "跨技能經驗共享",
+    features_card2_desc: "當觸發任何輔助技能時，Deep-Memory 會強制檢索該技能的歷史操作經驗，對常見的 API 版本衝突、參數失效及認證過期發出主動警告。",
+    
+    features_card3_tag: "Offline Search",
+    features_card3_title: "本機 RAG 混合檢索",
+    features_card3_desc: "整合本機 ChromaDB 向量檢索與 BM25 關鍵字檢索，並經由 CPU 進行重排（Rerank）。無須連接外部雲端資料庫，確保您的代碼隱私安全。",
+    
+    features_card4_tag: "Sync & Backup",
+    features_card4_title: "跨系統同步與安全備份",
+    features_card4_desc: "支援 Windows、macOS 與 Linux 跨系統同步。自動解決路徑與環境變數差異，並可一鍵備份至 GitHub 私人倉庫，防範任何因系統崩潰造成的記憶遺失。",
+    
+    arch_badge: "System Architecture",
+    arch_title: "本機分層記憶體佈局",
+    arch_desc: "本機儲存層、混合檢索引擎與遠端備份的資料流向。",
+    arch_group_label: "LOCAL MEMORY SYSTEM (本機記憶庫系統)",
+    arch_agent: "AI Agent / IDE",
+    arch_agent_sub: "用戶對話視窗",
+    arch_loop: "Task Control Loop",
+    arch_loop_sub: "deep-memory 核心",
+    arch_hot: "Hot Store",
+    arch_hot_sub: "knowledge-base/ (.md)",
+    arch_cold: "Cold Store",
+    arch_cold_sub: "raw.jsonl (Append-only)",
+    arch_rag: "Local RAG Search",
+    arch_rag_sub: "ChromaDB 向量檢索",
+    arch_github_top: "私有",
+    arch_github_bottom: "GitHub",
+    arch_github_sub: "同步備份目標",
+    arch_refine: "精煉",
+    arch_vectorize: "向量化",
+    arch_task_end: "任務結束",
+    arch_every_turn: "每回合",
+    arch_query_feed: "查詢 / 注入",
+
+    timeline_badge: "The Loop",
+    timeline_title: "嚴謹的執行，在每一回合",
+    timeline_desc: "Deep-Memory 默默運行於背景，讓您維持在高效的 Flow 狀態。",
+    
+    storage_badge: "Hot / Cold Storage",
+    storage_title: "分層儲存：兼顧檢索性能與日誌完整性",
+    storage_card_cold_tag: "APPEND-ONLY LOG",
+    storage_card_cold_title: "Cold Store (冷記憶庫)",
+    storage_card_cold_desc: "每回合對話的原始內容，均會透過 Python 標準庫默默寫入 `cold-notes/raw.jsonl`，確保最完整的第一手紀錄不遺失。",
+    storage_card_hot_tag: "CURATED KNOWLEDGE",
+    storage_card_hot_title: "Hot Store (熱記憶庫)",
+    storage_card_hot_desc: "冷資料經過精煉後，轉化為結構化的 `.md` 知識庫與技能踩坑日誌，由本機向量檢索快速配對，直接注入 Agent 上下文。",
+    storage_card_hot_status: "RAG 已就緒",
+    
+    cta_title: "告別每次從零開始的對話",
+    cta_desc: "數分鐘內完成配置，讓您的 AI Agent 擁有持久化記憶，無須手動記筆記。",
+    
+    footer_license: "Deep-Memory · MIT 授權條款",
+    footer_desc: "基於 auto-skill 的深度重構版本"
+  },
+  en: {
+    brand: "Deep-Memory",
+    nav_features: "Features",
+    nav_arch: "Architecture",
+    nav_timeline: "The Loop",
+    nav_pricing: "Storage",
+    
+    hero_badge: "Optimized for Dark/Emerald · Powered by UI/UX PRO MAX",
+    hero_title: "Give AI Agent a Self-Evolving",
+    hero_title_highlight: "Lifetime Memory",
+    hero_desc: "A local-first CLI knowledge system. Runs quietly in the background, analyzing user conversations automatically to crystallize valuable engineering experience and prevent repeated pitfalls.",
+    hero_btn_github: "Go to GitHub Repo",
+    hero_btn_see_how: "See How It Works",
+    hero_highlight_1: "A deep refactor of auto-skill",
+    hero_highlight_2: "Local ChromaDB hybrid search",
+    hero_highlight_3: "Cross-device GitHub backup",
+    
+    features_badge: "Features",
+    features_title: "Smarter, friction-free workflow",
+    features_desc: "Zero disruption, proactive evolution. Silently documenting everything while you code.",
+    
+    features_card1_tag: "Self-Evolving",
+    features_card1_title: "Memory loop that grows stronger",
+    features_card1_desc: "Checks a keyword index every turn. When it detects specific tools or known problems, it recalls past pitfalls and working parameters automatically to prevent redundant work.",
+    
+    features_card2_tag: "Cross-Skill",
+    features_card2_title: "Cross-skill memory sharing",
+    features_card2_desc: "Whenever another skill is invoked, Deep-Memory checks its skill experience store and proactively warns about past pitfalls like API changes, parameters, or credentials.",
+    
+    features_card3_tag: "Offline Search",
+    features_card3_title: "Local hybrid retrieval",
+    features_card3_desc: "Combines ChromaDB vector search with BM25 keyword matching, reranked locally on CPU. No external cloud connections needed, keeping your code fully private.",
+    
+    features_card4_tag: "Sync & Backup",
+    features_card4_title: "Cross-system sync & safe backup",
+    features_card4_desc: "Supports Windows, macOS, and Linux. Automatically resolves path conflicts, and syncs safely to your private GitHub repo to safeguard against system crashes.",
+    
+    arch_badge: "System Architecture",
+    arch_title: "Tiered Local Memory Layout",
+    arch_desc: "How local storage layers, the hybrid search engine, and remote backups interact seamlessly.",
+    arch_group_label: "LOCAL MEMORY SYSTEM",
+    arch_agent: "AI Agent / IDE",
+    arch_agent_sub: "User Chat Session",
+    arch_loop: "Task Control Loop",
+    arch_loop_sub: "deep-memory Core",
+    arch_hot: "Hot Store",
+    arch_hot_sub: "knowledge-base/ (.md)",
+    arch_cold: "Cold Store",
+    arch_cold_sub: "raw.jsonl (Append-only)",
+    arch_rag: "Local RAG Search",
+    arch_rag_sub: "ChromaDB + BM25",
+    arch_github_top: "Private",
+    arch_github_bottom: "GitHub",
+    arch_github_sub: "Sync Target",
+    arch_refine: "Refine",
+    arch_vectorize: "Vectorize",
+    arch_task_end: "Task end",
+    arch_every_turn: "Every turn",
+    arch_query_feed: "Query / Feed",
+
+    timeline_badge: "The Loop",
+    timeline_title: "Disciplined execution. Every turn.",
+    timeline_desc: "Deep-Memory runs quietly in the background so you can stay in flow.",
+    
+    storage_badge: "Hot / Cold Storage",
+    storage_title: "Tiered storage for performance and volume",
+    storage_card_cold_tag: "APPEND-ONLY LOG",
+    storage_card_cold_title: "Cold Store",
+    storage_card_cold_desc: "Every turn exchanging real content is written automatically to `cold-notes/raw.jsonl` using standard library Python. Nothing is ever lost.",
+    storage_card_hot_tag: "CURATED KNOWLEDGE",
+    storage_card_hot_title: "Hot Store",
+    storage_card_hot_desc: "A curated folder of structured `.md` categories and skill pitfall logs, indexed by keywords for rapid, automatic injection.",
+    storage_card_hot_status: "RAG Ready",
+    
+    cta_title: "Stop starting from zero.",
+    cta_desc: "Install it in your project in minutes — no manual note-taking required.",
+    
+    footer_license: "Deep-Memory · MIT License",
+    footer_desc: "A deep refactor of auto-skill"
+  }
+};
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    const savedLang = localStorage.getItem('lang') || 'zh';
+    
+    this.state = {
+      theme: savedTheme,
+      lang: savedLang
+    };
+
+    // Apply initial theme to document element
+    if (savedTheme === 'light') {
+      document.documentElement.classList.add('light-mode');
+    } else {
+      document.documentElement.classList.remove('light-mode');
+    }
+  }
+
+  toggleTheme() {
+    const newTheme = this.state.theme === 'dark' ? 'light' : 'dark';
+    this.setState({ theme: newTheme });
+    localStorage.setItem('theme', newTheme);
+    if (newTheme === 'light') {
+      document.documentElement.classList.add('light-mode');
+    } else {
+      document.documentElement.classList.remove('light-mode');
+    }
+  }
+
+  toggleLang() {
+    const newLang = this.state.lang === 'zh' ? 'en' : 'zh';
+    this.setState({ lang: newLang });
+    localStorage.setItem('lang', newLang);
+  }
+
+  renderVals() {
+    const t = T[this.state.lang];
+    return {
+      t,
+      lang: this.state.lang,
+      theme: this.state.theme,
+      toggleTheme: () => this.toggleTheme(),
+      toggleLang: () => this.toggleLang(),
+      highlights: [
+        { icon: '🔁', title: this.state.lang === 'zh' ? '自動精煉與沉澱' : 'Genuinely Gets Stronger', desc: this.state.lang === 'zh' ? '每回合自動分析對話關鍵字與主題。當偵測到您正在使用特定工具或遇到已知問題時，主動載入過去踩坑紀錄與最佳實踐參數，防止重複開發。' : 'Checks a keyword index every turn — if it recognizes a problem it has solved before, it recalls the best solution or pitfall guide directly.' },
+        { icon: '🧩', title: this.state.lang === 'zh' ? '跨技能經驗共享' : 'Cross-Skill Memory', desc: this.state.lang === 'zh' ? '當觸發 any 輔助技能時，Deep-Memory 會強制檢索該技能的歷史操作經驗，對常見的 API 版本衝突、參數失效及認證過期發出主動警告。' : 'Whenever another skill is invoked, Deep-Memory checks its skill experience store and proactively warns about past pitfalls.' },
+        { icon: '✍️', title: this.state.lang === 'zh' ? '自動精煉與沉澱' : 'Proactive Experience Capture', desc: this.state.lang === 'zh' ? '冷資料經過精煉後，轉化為結構化的 .md 知識庫與技能踩坑日誌，由本機向量檢索快速配對，直接注入 Agent 上下文。' : 'When a task is completed well, the AI proactively offers to record what worked — no manual note-taking required.' },
+        { icon: '📦', title: this.state.lang === 'zh' ? '本機 RAG 混合檢索' : 'Modular Skill Packaging', desc: this.state.lang === 'zh' ? '整合本機 ChromaDB 向量檢索與 BM25 關鍵字檢索，並經由 CPU 進行重排（Rerank）。無須連接外部雲端資料庫，確保您的代碼隱私安全。' : 'Private data is fully separated from code. Local hybrid retrieval combines semantic search with BM25 and CPU-based reranking.' },
+        { icon: '🔐', title: this.state.lang === 'zh' ? '跨系統同步與安全備份' : 'Safe Cross-Device Backup', desc: this.state.lang === 'zh' ? '支援 Windows、macOS 與 Linux 跨系統同步。自動解決路徑與環境變數差異，並可一鍵備份至 GitHub 私人倉庫，防範任何因系統崩潰造成的記憶遺失。' : 'Push your knowledge base to your own private GitHub repo, then restore it safely on a new machine without ever overwriting existing files.' },
+      ],
+      steps: [
+        { n: '01', title: this.state.lang === 'zh' ? '關鍵字指紋提取' : 'Keyword Fingerprinting', desc: this.state.lang === 'zh' ? '提取對話中核心關鍵字，即時產生唯一主題指紋。' : 'Extracts core keywords from the conversation to generate a unique topic fingerprint instantly.' },
+        { n: '02', title: this.state.lang === 'zh' ? '主題切換偵測' : 'Topic Switch Detection', desc: this.state.lang === 'zh' ? '判斷用戶是否啟動新主題，決定是否重新讀取知識庫。' : 'Determines whether the user has started a new topic, deciding if the knowledge base needs re-reading.' },
+        { n: '03', title: this.state.lang === 'zh' ? '經驗回溯檢索' : 'Experience Lookup', desc: this.state.lang === 'zh' ? '若觸發特定技能，強制檢索該技能的歷史踩坑紀錄與最佳實踐參數。' : 'If a specific skill was used, mandatorily checks for past pitfall records or working parameters.' },
+        { n: '04', title: this.state.lang === 'zh' ? '常規知識檢索' : 'General Knowledge Retrieval', desc: this.state.lang === 'zh' ? '依任務類型自動比對索引，並加載相關最佳實踐。' : 'Automatically matches the index by task type and loads the relevant best practices.' },
+        { n: '05', title: this.state.lang === 'zh' ? '主動寫回記錄' : 'Proactive Recording', desc: this.state.lang === 'zh' ? '當單一任務完成度高時，主動精煉並寫回核心經驗到冷庫。' : 'Once a task reaches a high degree of completion, extracts and writes back the core takeaway.' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2026 流行色幾何互動藝術空間</title>
+  <!-- 載入高級設計感字型 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <!-- CSS 樣式表 -->
+  <link rel="stylesheet" href="style.css">
+  <!-- p5.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body>
+  
+  <!-- p5.js 畫布容器 -->
+  <div id="canvas-container"></div>
+
+  <!-- 毛玻璃控制面板 -->
+  <div class="control-panel" id="control-panel">
+    <div class="panel-header">
+      <div class="brand-eyebrow">Aesthetic Space</div>
+      <h1 class="brand-title">2026 GEOMETRIC ART</h1>
+      <p class="brand-subtitle">互動幾何與流行色過渡</p>
+    </div>
+
+    <div class="panel-body">
+      <!-- 藝術視覺模式 -->
+      <div class="control-group">
+        <label class="group-title">藝術視覺模式</label>
+        <div class="mode-selector">
+          <button class="mode-btn active" data-mode="1" id="btn-mode-1">
+            <span class="mode-icon">✦</span> 有機流動
+          </button>
+          <button class="mode-btn" data-mode="2" id="btn-mode-2">
+            <span class="mode-icon">⚃</span> 包浩斯秩序
+          </button>
+          <button class="mode-btn" data-mode="3" id="btn-mode-3">
+            <span class="mode-icon">≋</span> 弦音波紋
+          </button>
+        </div>
+      </div>
+
+      <!-- 2026 流行色調色盤 -->
+      <div class="control-group">
+        <label class="group-title">2026 流行色系</label>
+        <div class="palette-selector" id="palette-selector">
+          <!-- 會在 sketch.js 中動態渲染，或先預寫結構 -->
+          <button class="palette-btn active" data-palette="0" id="btn-pal-0">
+            <span class="pal-dot" style="background: #005A5B;"></span>
+            變革之境 (Teal & Yellow)
+          </button>
+          <button class="palette-btn" data-palette="1" id="btn-pal-1">
+            <span class="pal-dot" style="background: #B85A3C;"></span>
+            奢華陶土 (Clay & Lilac)
+          </button>
+          <button class="palette-btn" data-palette="2" id="btn-pal-2">
+            <span class="pal-dot" style="background: #D4FF3A;"></span>
+            清新衝擊 (Lime & Tomato)
+          </button>
+          <button class="palette-btn" data-palette="3" id="btn-pal-3">
+            <span class="pal-dot" style="background: #A4D8F4;"></span>
+            極簡冷靜 (Glacial Dancer)
+          </button>
+        </div>
+      </div>
+
+      <!-- 調色盤預覽與色碼複製 -->
+      <div class="control-group">
+        <label class="group-title">當前色譜 (點擊複製 HEX)</label>
+        <div class="color-palette-preview" id="palette-preview">
+          <!-- sketch.js 中渲染具體色塊 -->
+        </div>
+      </div>
+
+      <!-- 參數調整 -->
+      <div class="control-group">
+        <label class="group-title">參數微調</label>
+        
+        <div class="slider-wrapper">
+          <div class="slider-label-row">
+            <span>圖形密度 (Density)</span>
+            <span class="slider-val" id="val-density">12</span>
+          </div>
+          <input type="range" id="slider-density" min="4" max="30" value="12" step="1">
+        </div>
+
+        <div class="slider-wrapper">
+          <div class="slider-label-row">
+            <span>流動速度 (Speed)</span>
+            <span class="slider-val" id="val-speed">1.0</span>
+          </div>
+          <input type="range" id="slider-speed" min="0.1" max="3.0" value="1.0" step="0.1">
+        </div>
+
+        <div class="slider-wrapper">
+          <div class="slider-label-row">
+            <span>互動感應 (Sensitivity)</span>
+            <span class="slider-val" id="val-sensitivity">1.0</span>
+          </div>
+          <input type="range" id="slider-sensitivity" min="0.2" max="2.0" value="1.0" step="0.1">
+        </div>
+      </div>
+
+      <!-- 自動播放與狀態 -->
+      <div class="control-group toggle-row">
+        <label class="group-title" style="margin-bottom: 0;">自動流動 (Auto Flow)</label>
+        <label class="switch">
+          <input type="checkbox" id="toggle-autoplay" checked>
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- 操作按鈕 -->
+    <div class="panel-footer">
+      <button class="action-btn secondary-btn" id="btn-random">
+        <span>⚅</span> 隨機重組
+      </button>
+      <button class="action-btn primary-btn" id="btn-export">
+        <span>↓</span> 導出藝術圖
+      </button>
+    </div>
+  </div>
+
+  <!-- 提示浮窗 (用於複製色碼時提示) -->
+  <div class="toast" id="toast">已複製色碼到剪貼簿！</div>
+
+  <!-- 載入互動邏輯 -->
+  <script src="sketch.js"></script>
+</body>
+</html>
