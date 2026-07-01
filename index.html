@@ -345,8 +345,9 @@
           
           <div style="display: flex; gap: 8px; align-items: center; border-left: 1px solid var(--border-color); padding-left: 16px; margin-left: 8px;">
             <!-- Language toggle -->
-            <button onclick="{{toggleLang}}" class="mono" style="background: none; border: 1px solid var(--border-color); color: var(--text-secondary); padding: 5px 9px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: 600; text-transform: uppercase;">
-              {{lang === 'zh' ? 'EN' : '繁體'}}
+            <button onclick="{{toggleLang}}" class="mono" style="background: none; border: 1px solid var(--border-color); color: var(--text-secondary); padding: 5px 9px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: 600; text-transform: uppercase; display: flex; align-items: center; justify-content: center; min-width: 42px; min-height: 24px;">
+              <sc-if value="{{lang === 'zh'}}">EN</sc-if>
+              <sc-if value="{{lang !== 'zh'}}">繁體</sc-if>
             </button>
             <!-- Theme toggle -->
             <button onclick="{{toggleTheme}}" style="background: none; border: 1px solid var(--border-color); color: var(--text-secondary); padding: 5px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
@@ -385,9 +386,19 @@
           {{t.hero_desc}}
         </p>
 
-        <div style="display: flex; gap: 16px; justify-content: center; margin-bottom: 64px;">
+        <div style="display: flex; gap: 16px; justify-content: center; margin-bottom: 24px;">
           <a href="https://github.com/kevintsai1202/deep-memory" class="btn-primary" style="text-decoration: none;">{{t.hero_btn_github}}</a>
           <a href="#how" class="btn-secondary" style="text-decoration: none;">{{t.hero_btn_see_how}}</a>
+        </div>
+
+        <!-- 快速安裝指令 -->
+        <div style="display: flex; justify-content: center; margin-bottom: 64px;">
+          <div onclick="navigator.clipboard.writeText('npx skills add kevintsai1202/deep-memory -y'); alert('Copied / 已複製: npx skills add kevintsai1202/deep-memory -y');" class="mono" style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.15); padding: 10px 18px; border-radius: 8px; font-size: 13.5px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s;" title="點擊複製安裝指令" onmouseover="this.style.background='rgba(16, 185, 129, 0.1)'; this.style.borderColor='rgba(16, 185, 129, 0.3)';" onmouseout="this.style.background='rgba(16, 185, 129, 0.05)'; this.style.borderColor='rgba(16, 185, 129, 0.15)';">
+            <span style="color: var(--brand-color); font-weight: 600;">$</span> <span style="color: var(--text-primary);">npx</span> skills add kevintsai1202/deep-memory -y
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left: 8px; opacity: 0.7;">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </div>
         </div>
 
         <!-- 亮點標籤 -->
@@ -395,7 +406,7 @@
           <div class="mono"
             style="color: var(--text-muted); font-size: 13px; display: flex; align-items: center; gap: 8px;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              style="color: var(--brand-color);">
+               style="color: var(--brand-color);">
               <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
             </svg>
             {{t.hero_highlight_1}}
@@ -439,19 +450,20 @@
           </div>
           <div class="mono"
             style="padding: 24px; font-size: 13.5px; line-height: 1.6; color: #dfe3e7; overflow-x: auto;">
-            <div style="color: var(--text-muted); margin-bottom: 8px;"># Initialize query using local hybrid search
-            </div>
+            <div style="color: var(--text-muted); margin-bottom: 8px;"># Install the deep-memory skill extension</div>
             <div style="margin-bottom: 8px;"><span style="color: var(--brand-color);">$</span> <span
-                style="color: var(--text-primary);">python skills/chroma-hybrid-search/scripts/search.py --query
-                "refactor auto-skill"</span></div>
+                style="color: var(--text-primary);">npx skills add kevintsai1202/deep-memory -y</span></div>
+            <div style="color: var(--brand-color); margin-bottom: 20px;">[Install] Successfully added deep-memory skill to Claude Desktop!</div>
+
+            <div style="color: var(--text-muted); margin-bottom: 8px;"># Initialize query using local hybrid search</div>
+            <div style="margin-bottom: 8px;"><span style="color: var(--brand-color);">$</span> <span
+                style="color: var(--text-primary);">python skills/chroma-hybrid-search/scripts/search.py --query "refactor auto-skill"</span></div>
             <div style="color: #60a5fa; margin-bottom: 4px;">[Search] Running ChromaDB + BM25 retrieve... done</div>
-            <div style="color: var(--text-secondary); margin-bottom: 12px;">[Match] Injected 1 experience record into AI
-              Agent:</div>
+            <div style="color: var(--text-secondary); margin-bottom: 12px;">[Match] Injected 1 experience record into AI Agent:</div>
             <div
               style="background: rgba(16, 185, 129, 0.04); border-left: 2px solid var(--brand-color); padding: 10px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px;">
               <span style="color: var(--brand-color); font-weight: 600;">experience/skill-auto-skill.md</span><br />
-              <span style="color: var(--text-secondary); font-size: 12.5px;">- Critical: governing path resolution on
-                Windows vs Linux environments</span>
+              <span style="color: var(--text-secondary); font-size: 12.5px;">- Critical: governing path resolution on Windows vs Linux environments</span>
             </div>
             <div style="color: var(--brand-color); margin-bottom: 8px;"><span
                 style="color: var(--text-muted);">&gt;&gt;</span> Core context loaded successfully. Memory synced.</div>
