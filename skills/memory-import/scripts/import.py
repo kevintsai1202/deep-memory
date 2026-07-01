@@ -273,8 +273,87 @@ def write_claude_local_to_hot(memories, workspace, dry_run):
     print("  python skills/chroma-hybrid-search/scripts/update_db.py --workspace " + workspace)
 
 
+def _merge_autoskill_half(input_dir, workspace, subdir, force, dry_run):
+    """
+    合併舊 auto-skill 專案的 knowledge-base/ 或 experience/ 半邊到本機。
+    來源索引的分類清單可能放在 "categories" 或 "skills" key 下（舊格式從未明確規範過），
+    兩者都嘗試讀取；寫回本機一律正規化成 "categories"，跟 deep-memory 現有的
+    knowledge-base/_index.json 結構一致。
+    """
+    src_dir = os.path.join(input_dir, subdir)
+    src_index_path = os.path.join(src_dir, "_index.json")
+    if not os.path.exists(src_index_path):
+        print(f"[WARN] 來源缺少 {subdir}/_index.json，跳過這一半")
+        return 0, 0
+
+    with open(src_index_path, "r", encoding="utf-8") as f:
+        src_index = json.load(f)
+    src_categories = src_index.get("categories") or src_index.get("skills") or []
+
+    dest_dir = os.path.join(workspace, subdir)
+    dest_index_path = os.path.join(dest_dir, "_index.json")
+    if os.path.exists(dest_index_path):
+        with open(dest_index_path, "r", encoding="utf-8") as f:
+            dest_index = json.load(f)
+    else:
+        dest_index = {"_version": 1, "categories": []}
+    dest_by_id = {cat["id"]: cat for cat in dest_index["categories"]}
+
+    added, skipped = 0, 0
+    for cat in src_categories:
+        cat_id = cat.get("id") or cat.get("skill_id") or cat.get("skill-id")
+        cat_file = cat.get("file")
+        if not cat_id or not cat_file:
+            print(f"[WARN] {subdir}: 略過缺少 id/file 的索引項目：{cat}")
+            continue
+
+        exists = cat_id in dest_by_id
+        if exists and not force:
+            skipped += 1
+            continue
+
+        if dry_run:
+            action = "覆蓋" if exists else "新增"
+            print(f"[DRY-RUN] {subdir}: {action} {cat_id} ({cat_file})")
+            added += 1
+            continue
+
+        src_file = os.path.join(src_dir, cat_file)
+        if not os.path.exists(src_file):
+            print(f"[WARN] {subdir}: 來源檔案不存在：{src_file}，跳過 {cat_id}")
+            continue
+
+        os.makedirs(dest_dir, exist_ok=True)
+        shutil.copy2(src_file, os.path.join(dest_dir, cat_file))
+
+        normalized = {
+            "id": cat_id,
+            "file": cat_file,
+            "title": cat.get("title", cat_id),
+            "keywords": cat.get("keywords", []),
+        }
+        if exists:
+            dest_by_id[cat_id].update(normalized)
+        else:
+            dest_index["categories"].append(normalized)
+            dest_by_id[cat_id] = normalized
+        added += 1
+
+    if not dry_run:
+        os.makedirs(dest_dir, exist_ok=True)
+        with open(dest_index_path, "w", encoding="utf-8") as f:
+            json.dump(dest_index, f, ensure_ascii=False, indent=2)
+
+    return added, skipped
+
+
 def merge_autoskill(input_dir, workspace, force, dry_run):
-    raise NotImplementedError
+    """安全合併舊 auto-skill 格式的 knowledge-base/ 與 experience/ 到本機（id 存在則預設跳過）"""
+    for subdir in ("knowledge-base", "experience"):
+        added, skipped = _merge_autoskill_half(input_dir, workspace, subdir, force, dry_run)
+        label = "DRY-RUN" if dry_run else "OK"
+        verb = "會處理" if dry_run else "已合併"
+        print(f"[{label}] {subdir}: {verb} {added} 筆，跳過 {skipped} 筆（已存在，未加 --force）")
 
 
 def main():
