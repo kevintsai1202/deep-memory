@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html class="light-mode">
 
 <head>
   <meta charset="utf-8">
@@ -46,6 +46,21 @@
           --nav-bg: rgba(7, 8, 10, 0.85);
           /* 導航列背景 */
 
+          /* SVG 專用變數 (Dark Mode) */
+          --svg-line: rgba(255, 255, 255, 0.4);
+          --svg-arrow: rgba(255, 255, 255, 0.7);
+          --svg-border: rgba(255, 255, 255, 0.22);
+          --svg-text-muted: rgba(255, 255, 255, 0.6);
+          --svg-grid: rgba(255, 255, 255, 0.03);
+          --svg-card-bg-start: rgba(30, 41, 59, 0.7);
+          --svg-card-bg-end: rgba(15, 23, 42, 0.85);
+          --svg-white-glow-color: #ffffff;
+          --svg-white-glow-opacity: 0.15;
+          --svg-green-start: rgba(16, 185, 129, 0.15);
+          --svg-green-end: rgba(16, 185, 129, 0.03);
+          --svg-blue-start: rgba(59, 130, 246, 0.15);
+          --svg-blue-end: rgba(59, 130, 246, 0.03);
+
           --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           --font-mono: 'IBM Plex Mono', monospace;
           --section-padding: 120px;
@@ -76,6 +91,47 @@
           /* 亮藍色 */
           --timeline-connector: rgba(0, 0, 0, 0.15);
           --nav-bg: rgba(249, 250, 251, 0.85);
+
+          /* SVG 專用變數 (Light Mode) */
+          --svg-line: rgba(0, 0, 0, 0.18);
+          --svg-arrow: rgba(0, 0, 0, 0.45);
+          --svg-border: rgba(0, 0, 0, 0.12);
+          --svg-text-muted: rgba(0, 0, 0, 0.45);
+          --svg-grid: rgba(0, 0, 0, 0.04);
+          --svg-card-bg-start: rgba(255, 255, 255, 0.95);
+          --svg-card-bg-end: rgba(243, 244, 246, 0.95);
+          --svg-white-glow-color: #000000;
+          --svg-white-glow-opacity: 0.06;
+          --svg-green-start: rgba(16, 185, 129, 0.08);
+          --svg-green-end: rgba(16, 185, 129, 0.02);
+          --svg-blue-start: rgba(59, 130, 246, 0.08);
+          --svg-blue-end: rgba(59, 130, 246, 0.02);
+        }
+
+        /* SVG Defs Style Fixes for theme inheritance */
+        #arrow path {
+          fill: var(--svg-arrow);
+        }
+        #grid path {
+          stroke: var(--svg-grid);
+        }
+        #grad-dark stop:first-child {
+          stop-color: var(--svg-card-bg-start);
+        }
+        #grad-dark stop:last-child {
+          stop-color: var(--svg-card-bg-end);
+        }
+        #grad-green stop:first-child {
+          stop-color: var(--svg-green-start);
+        }
+        #grad-green stop:last-child {
+          stop-color: var(--svg-green-end);
+        }
+        #grad-blue stop:first-child {
+          stop-color: var(--svg-blue-start);
+        }
+        #grad-blue stop:last-child {
+          stop-color: var(--svg-blue-end);
         }
 
         /* 日間模式特定元素覆蓋 */
@@ -550,7 +606,7 @@
             <defs>
               <!-- Background grid pattern -->
               <pattern id="grid" width="25" height="25" patternUnits="userSpaceOnUse">
-                <path d="M 25 0 L 0 0 0 25" fill="none" stroke="rgba(255, 255, 255, 0.03)" stroke-width="1" />
+                <path d="M 25 0 L 0 0 0 25" fill="none" stroke="var(--svg-grid)" stroke-width="1" />
               </pattern>
               
               <!-- Glow Filters -->
@@ -561,12 +617,12 @@
                 <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#3b82f6" flood-opacity="0.4" />
               </filter>
               <filter id="glow-white" x="-20%" y="-20%" width="140%" height="140%">
-                <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#ffffff" flood-opacity="0.15" />
+                <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="var(--svg-white-glow-color)" flood-opacity="var(--svg-white-glow-opacity)" />
               </filter>
 
               <!-- Arrow Markers -->
               <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M 0 2 L 6 5 L 0 8 z" fill="rgba(255,255,255,0.85)"/>
+                <path d="M 0 2 L 6 5 L 0 8 z" fill="var(--svg-arrow)"/>
               </marker>
               <marker id="arrow-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                 <path d="M 0 2 L 6 5 L 0 8 z" fill="#10b981"/>
@@ -577,16 +633,16 @@
 
               <!-- Gradients -->
               <linearGradient id="grad-green" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="rgba(16, 185, 129, 0.15)" />
-                <stop offset="100%" stop-color="rgba(16, 185, 129, 0.03)" />
+                <stop offset="0%" stop-color="var(--svg-green-start)" />
+                <stop offset="100%" stop-color="var(--svg-green-end)" />
               </linearGradient>
               <linearGradient id="grad-blue" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="rgba(59, 130, 246, 0.15)" />
-                <stop offset="100%" stop-color="rgba(59, 130, 246, 0.03)" />
+                <stop offset="0%" stop-color="var(--svg-blue-start)" />
+                <stop offset="100%" stop-color="var(--svg-blue-end)" />
               </linearGradient>
               <linearGradient id="grad-dark" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="rgba(30, 41, 59, 0.6)" />
-                <stop offset="100%" stop-color="rgba(15, 23, 42, 0.8)" />
+                <stop offset="0%" stop-color="var(--svg-card-bg-start)" />
+                <stop offset="100%" stop-color="var(--svg-card-bg-end)" />
               </linearGradient>
             </defs>
 
@@ -594,68 +650,106 @@
             <rect width="100%" height="100%" fill="url(#grid)" rx="8" />
 
             <!-- Input Box (AI Agent / IDE) -->
-            <rect x="20" y="150" width="160" height="80" rx="8" fill="url(#grad-dark)" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" filter="url(#glow-white)" />
-            <text x="100" y="190" text-anchor="middle" font-size="14" font-weight="600" fill="var(--text-primary)">{{t.arch_agent}}</text>
-            <text x="100" y="210" text-anchor="middle" font-size="11" font-family="var(--font-mono)" fill="var(--text-secondary)">{{t.arch_agent_sub}}</text>
+            <rect x="20" y="150" width="160" height="80" rx="8" fill="url(#grad-dark)" stroke="var(--svg-border)" stroke-width="1.5" filter="url(#glow-white)" />
+            <foreignObject x="20" y="150" width="160" height="80">
+              <div style="width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 6px; box-sizing: border-box; text-align: center; line-height: 1.35; user-select: none;">
+                <div style="font-size: 14px; font-weight: 600; color: var(--text-primary);">{{t.arch_agent}}</div>
+                <div style="font-size: 10.5px; font-family: var(--font-mono); color: var(--text-secondary); margin-top: 3px;">{{t.arch_agent_sub}}</div>
+              </div>
+            </foreignObject>
 
             <!-- Line: Input -> Core -->
-            <path d="M 180 190 L 242 190" stroke="rgba(255,255,255,0.5)" stroke-width="2" class="flow-path" marker-end="url(#arrow)" />
+            <path d="M 180 190 L 242 190" stroke="var(--svg-line)" stroke-width="2" class="flow-path" marker-end="url(#arrow)" />
 
             <!-- Core Logic Engine (deep-memory) -->
             <rect x="250" y="150" width="160" height="80" rx="8" fill="url(#grad-green)" stroke="#10b981" stroke-width="2" filter="url(#glow-green)" />
-            <text x="330" y="190" text-anchor="middle" font-size="14" font-weight="600" fill="var(--brand-color)">deep-memory</text>
-            <text x="330" y="210" text-anchor="middle" font-size="11" font-family="var(--font-mono)" fill="var(--text-secondary)">{{t.arch_loop_sub}}</text>
+            <foreignObject x="250" y="150" width="160" height="80">
+              <div style="width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 6px; box-sizing: border-box; text-align: center; line-height: 1.35; user-select: none;">
+                <div style="font-size: 14px; font-weight: 600; color: var(--brand-color);">deep-memory</div>
+                <div style="font-size: 10.5px; font-family: var(--font-mono); color: var(--text-secondary); margin-top: 3px;">{{t.arch_loop_sub}}</div>
+              </div>
+            </foreignObject>
 
             <!-- Local Memory Group Bounding Box (Enclosing Hot, Cold, and RAG) -->
             <rect x="450" y="30" width="220" height="320" rx="12" fill="rgba(16, 185, 129, 0.01)" stroke="rgba(16, 185, 129, 0.3)" stroke-width="1.5" stroke-dasharray="4 4" />
-            <text x="560" y="20" text-anchor="middle" font-size="11" font-weight="600" fill="var(--brand-color)" letter-spacing="0.05em">{{t.arch_group_label}}</text>
+            <foreignObject x="450" y="5" width="220" height="22">
+              <div style="width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; text-align: center; font-size: 10.5px; font-weight: 600; color: var(--brand-color); letter-spacing: 0.05em; user-select: none;">
+                {{t.arch_group_label}}
+              </div>
+            </foreignObject>
 
             <!-- Hot Store Card -->
-            <rect x="480" y="50" width="160" height="65" rx="6" fill="url(#grad-dark)" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" />
-            <text x="560" y="80" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text-primary)">{{t.arch_hot}}</text>
-            <text x="560" y="98" text-anchor="middle" font-size="10" font-family="var(--font-mono)" fill="rgba(255,255,255,0.6)">{{t.arch_hot_sub}}</text>
+            <rect x="480" y="50" width="160" height="65" rx="6" fill="url(#grad-dark)" stroke="var(--svg-border)" stroke-width="1.5" />
+            <foreignObject x="480" y="50" width="160" height="65">
+              <div style="width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 6px; box-sizing: border-box; text-align: center; line-height: 1.35; user-select: none;">
+                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">{{t.arch_hot}}</div>
+                <div style="font-size: 9.5px; font-family: var(--font-mono); color: var(--svg-text-muted); margin-top: 2px;">{{t.arch_hot_sub}}</div>
+              </div>
+            </foreignObject>
 
             <!-- Line: Cold -> Hot (Refinement Process) -->
             <path d="M 560 150 L 560 123" stroke="#10b981" stroke-width="2" class="flow-path" marker-end="url(#arrow-green)" />
-            <text x="570" y="140" font-size="10" font-family="var(--font-mono)" fill="#10b981" font-weight="600">{{t.arch_refine}}</text>
+            <foreignObject x="570" y="128" width="80" height="22">
+              <div style="font-size: 10px; font-family: var(--font-mono); color: #10b981; font-weight: 600; text-align: left; user-select: none;">{{t.arch_refine}}</div>
+            </foreignObject>
 
             <!-- Cold Store Card -->
-            <rect x="480" y="150" width="160" height="65" rx="6" fill="url(#grad-dark)" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" />
-            <text x="560" y="180" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text-primary)">{{t.arch_cold}}</text>
-            <text x="560" y="198" text-anchor="middle" font-size="10" font-family="var(--font-mono)" fill="rgba(255,255,255,0.6)">{{t.arch_cold_sub}}</text>
+            <rect x="480" y="150" width="160" height="65" rx="6" fill="url(#grad-dark)" stroke="var(--svg-border)" stroke-width="1.5" />
+            <foreignObject x="480" y="150" width="160" height="65">
+              <div style="width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 6px; box-sizing: border-box; text-align: center; line-height: 1.35; user-select: none;">
+                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">{{t.arch_cold}}</div>
+                <div style="font-size: 9.5px; font-family: var(--font-mono); color: var(--svg-text-muted); margin-top: 2px;">{{t.arch_cold_sub}}</div>
+              </div>
+            </foreignObject>
 
             <!-- Line: Cold -> Local RAG (Vectorization) -->
             <path d="M 560 215 L 560 252" stroke="#3b82f6" stroke-width="2" class="flow-path" marker-end="url(#arrow-blue)" />
-            <text x="570" y="240" font-size="10" font-family="var(--font-mono)" fill="#3b82f6" font-weight="600">{{t.arch_vectorize}}</text>
+            <foreignObject x="570" y="228" width="80" height="22">
+              <div style="font-size: 10px; font-family: var(--font-mono); color: #3b82f6; font-weight: 600; text-align: left; user-select: none;">{{t.arch_vectorize}}</div>
+            </foreignObject>
 
             <!-- Local RAG Hybrid Search Engine -->
             <rect x="480" y="260" width="160" height="65" rx="6" fill="url(#grad-blue)" stroke="#3b82f6" stroke-width="2" filter="url(#glow-blue)" />
-            <text x="560" y="290" text-anchor="middle" font-size="13" font-weight="600" fill="#60a5fa">{{t.arch_rag}}</text>
-            <text x="560" y="308" text-anchor="middle" font-size="10" font-family="var(--font-mono)" fill="rgba(96, 165, 250, 0.8)">{{t.arch_rag_sub}}</text>
+            <foreignObject x="480" y="260" width="160" height="65">
+              <div style="width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 6px; box-sizing: border-box; text-align: center; line-height: 1.35; user-select: none;">
+                <div style="font-size: 13px; font-weight: 600; color: var(--blue-color);">{{t.arch_rag}}</div>
+                <div style="font-size: 9.5px; font-family: var(--font-mono); color: var(--blue-color); margin-top: 2px;">{{t.arch_rag_sub}}</div>
+              </div>
+            </foreignObject>
 
             <!-- Lines: Core -> Local Memory System -->
             <!-- Core -> Hot Store -->
             <path d="M 390 170 Q 430 110 472 90" stroke="#10b981" stroke-width="2" fill="none" class="flow-path" marker-end="url(#arrow-green)" />
-            <text x="430" y="112" font-size="9" font-family="var(--font-mono)" fill="var(--brand-color)" font-weight="600">{{t.arch_task_end}}</text>
+            <foreignObject x="370" y="102" width="120" height="18">
+              <div style="font-size: 9px; font-family: var(--font-mono); color: var(--brand-color); font-weight: 600; text-align: center; user-select: none;">{{t.arch_task_end}}</div>
+            </foreignObject>
             
             <!-- Core -> Cold Store -->
-            <path d="M 390 190 L 472 190" stroke="rgba(255,255,255,0.5)" stroke-width="2" fill="none" class="flow-path" marker-end="url(#arrow)" />
-            <text x="430" y="182" font-size="9" font-family="var(--font-mono)" fill="var(--text-secondary)">{{t.arch_every_turn}}</text>
+            <path d="M 390 190 L 472 190" stroke="var(--svg-line)" stroke-width="2" fill="none" class="flow-path" marker-end="url(#arrow)" />
+            <foreignObject x="370" y="172" width="120" height="18">
+              <div style="font-size: 9px; font-family: var(--font-mono); color: var(--text-secondary); text-align: center; user-select: none;">{{t.arch_every_turn}}</div>
+            </foreignObject>
 
             <!-- Core <-> Local RAG Search -->
-            <path d="M 390 210 Q 430 270 472 290" stroke="rgba(255,255,255,0.5)" stroke-width="2" fill="none" class="flow-path" marker-end="url(#arrow)" />
-            <path d="M 480 292 Q 400 292 330 232" stroke="rgba(255,255,255,0.5)" stroke-width="2" fill="none" class="flow-path" marker-end="url(#arrow)" />
-            <text x="405" y="258" font-size="9" font-family="var(--font-mono)" fill="var(--text-secondary)">{{t.arch_query_feed}}</text>
+            <path d="M 390 210 Q 430 270 472 290" stroke="var(--svg-line)" stroke-width="2" fill="none" class="flow-path" marker-end="url(#arrow)" />
+            <path d="M 480 292 Q 400 292 330 232" stroke="var(--svg-line)" stroke-width="2" fill="none" class="flow-path" marker-end="url(#arrow)" />
+            <foreignObject x="355" y="248" width="100" height="18">
+              <div style="font-size: 9px; font-family: var(--font-mono); color: var(--text-secondary); text-align: center; user-select: none;">{{t.arch_query_feed}}</div>
+            </foreignObject>
 
             <!-- Lines: Stores -> Backup Sync -->
-            <path d="M 640 82 Q 700 82 712 150" stroke="rgba(255,255,255,0.5)" stroke-width="2" fill="none" class="flow-path" marker-end="url(#arrow)" />
-            <path d="M 640 182 Q 700 182 712 210" stroke="rgba(255,255,255,0.5)" stroke-width="2" fill="none" class="flow-path" marker-end="url(#arrow)" />
+            <path d="M 640 82 Q 700 82 712 150" stroke="var(--svg-line)" stroke-width="2" fill="none" class="flow-path" marker-end="url(#arrow)" />
+            <path d="M 640 182 Q 700 182 712 210" stroke="var(--svg-line)" stroke-width="2" fill="none" class="flow-path" marker-end="url(#arrow)" />
 
             <!-- Remote GitHub Storage (Cloud Backup) -->
-            <rect x="720" y="120" width="80" height="140" rx="8" fill="url(#grad-dark)" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" />
-            <text x="760" y="165" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text-primary)">{{t.arch_github_top}}</text>
-            <text x="760" y="185" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text-primary)">{{t.arch_github_bottom}}</text>
-            <text x="760" y="205" text-anchor="middle" font-size="10" font-family="var(--font-mono)" fill="rgba(255,255,255,0.6)">{{t.arch_github_sub}}</text>
+            <rect x="720" y="120" width="80" height="140" rx="8" fill="url(#grad-dark)" stroke="var(--svg-border)" stroke-width="1.5" />
+            <foreignObject x="720" y="120" width="80" height="140">
+              <div style="width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 6px; box-sizing: border-box; text-align: center; line-height: 1.35; user-select: none;">
+                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">{{t.arch_github_top}}</div>
+                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">{{t.arch_github_bottom}}</div>
+                <div style="font-size: 9.5px; font-family: var(--font-mono); color: var(--svg-text-muted); margin-top: 6px;">{{t.arch_github_sub}}</div>
+              </div>
+            </foreignObject>
           </svg>
         </div>
       </div>
@@ -947,7 +1041,7 @@ const T = {
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    const savedTheme = localStorage.getItem('theme') || 'dark';
+    const savedTheme = localStorage.getItem('theme') || 'light';
     const savedLang = localStorage.getItem('lang') || 'zh';
     
     this.state = {
