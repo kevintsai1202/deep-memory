@@ -1,0 +1,26 @@
+flowchart TD
+    In(["承接流程圖二"]) --> Cold["Step 5.1　冷庫：每輪預設寫入，免確認<br/>write_cold.py --topic --content --tags --skill"]
+    Cold --> ColdSkip{"這輪完全沒有<br/>可記錄內容？"}
+    ColdSkip -->|是，跳過| Hot
+    ColdSkip -->|否| DoCold["寫入 cold-notes/raw.jsonl"]
+    DoCold --> Hot
+
+    Hot{"Step 5.2　熱庫：<br/>任務完成或使用者表達滿意？"}
+    Hot -->|否| End(["本輪結束"])
+    Hot -->|是| Ask["主動詢問：<br/>要記錄這次的做法嗎？"]
+    Ask --> Confirm{"使用者同意？"}
+    Confirm -->|否| End
+    Confirm -->|是| WriteType{"跨技能經驗<br/>或通用知識？"}
+    WriteType -->|技能相關| WriteExp["寫入 experience/skill-[id].md<br/>更新 experience/_index.json"]
+    WriteType -->|通用可重用| WriteKB["寫入 knowledge-base/[category].md<br/>更新 knowledge-base/_index.json"]
+    WriteExp --> Remind
+    WriteKB --> Remind
+    Remind["提醒使用者：<br/>① 跑 update_db.py 重建索引<br/>② 跑 backup.py 備份到 GitHub"] --> End
+
+    classDef coldStyle fill:#EFF6FF,stroke:#2563EB,color:#1E3A8A
+    classDef hotStyle fill:#FEF2F2,stroke:#DC2626,color:#991B1B
+    classDef startEndStyle fill:#F5F3FF,stroke:#8B5CF6,color:#5B21B6
+
+    class Cold,ColdSkip,DoCold coldStyle
+    class Hot,Ask,Confirm,WriteType,WriteExp,WriteKB,Remind hotStyle
+    class In,End startEndStyle

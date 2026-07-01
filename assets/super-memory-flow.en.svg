@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 680" font-family="'Segoe UI', -apple-system, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6B7280"/>
+    </marker>
+    <marker id="arrowBi" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6B7280"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1040" height="680" fill="#FFFFFF"/>
+
+  <!-- Title -->
+  <text x="520" y="26" text-anchor="middle" font-size="19" font-weight="700" fill="#111827">Super-Memory Architecture &amp; Data Flow</text>
+  <text x="520" y="46" text-anchor="middle" font-size="12" fill="#6B7280">super-memory (orchestrator) + chroma-hybrid-search (retrieval) + memory-backup (backup / restore)</text>
+
+  <!-- Row A: User/Agent -->
+  <rect x="300" y="60" width="440" height="50" rx="10" fill="#F5F3FF" stroke="#8B5CF6" stroke-width="1.5"/>
+  <text x="520" y="82" text-anchor="middle" font-size="14" font-weight="700" fill="#5B21B6">User &#8596; AI Agent</text>
+  <text x="520" y="100" text-anchor="middle" font-size="11" fill="#6B7280">Triggers super-memory every turn</text>
+
+  <line x1="520" y1="110" x2="520" y2="138" stroke="#6B7280" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Row B: super-memory orchestrator -->
+  <rect x="70" y="140" width="900" height="110" rx="10" fill="#EEF2FF" stroke="#4F46E5" stroke-width="1.5"/>
+  <text x="520" y="164" text-anchor="middle" font-size="15" font-weight="700" fill="#312E81">super-memory (orchestrator / lead skill)</text>
+  <text x="520" y="182" text-anchor="middle" font-size="11" fill="#6B7280">Self-Evolving Knowledge Core Loop &#183; runs every conversation turn</text>
+  <text x="520" y="206" text-anchor="middle" font-size="12" fill="#374151">1 Extract keywords &#8594; 2 Detect topic switch &#8594; 3 Cross-skill experience lookup (mandatory)</text>
+  <text x="520" y="226" text-anchor="middle" font-size="12" fill="#374151">&#8594; 4 Knowledge base retrieval (MD-first / RAG fallback) &#8594; 5 Task complete &#183; proactive recording</text>
+
+  <!-- arrows B -> C -->
+  <line x1="290" y1="250" x2="290" y2="278" stroke="#6B7280" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="215" y="268" font-size="10.5" fill="#6B7280">delegates search</text>
+
+  <line x1="755" y1="250" x2="755" y2="278" stroke="#6B7280" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="765" y="268" font-size="10.5" fill="#6B7280">delegates backup/restore</text>
+
+  <!-- Row C left: chroma-hybrid-search -->
+  <rect x="70" y="280" width="440" height="110" rx="10" fill="#ECFDF5" stroke="#0D9488" stroke-width="1.5"/>
+  <text x="290" y="306" text-anchor="middle" font-size="14" font-weight="700" fill="#065F46">chroma-hybrid-search</text>
+  <text x="290" y="326" text-anchor="middle" font-size="12" fill="#374151">BM25 + Chroma vector search</text>
+  <text x="290" y="344" text-anchor="middle" font-size="12" fill="#374151">+ BGE-Reranker semantic re-ranking</text>
+  <text x="290" y="364" text-anchor="middle" font-size="10.5" fill="#6B7280">High-precision retrieval &#183; anti-hallucination (rerank score &gt; 0.35)</text>
+
+  <!-- Row C right: memory-backup -->
+  <rect x="540" y="280" width="430" height="110" rx="10" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/>
+  <text x="755" y="306" text-anchor="middle" font-size="14" font-weight="700" fill="#92400E">memory-backup</text>
+  <text x="755" y="326" text-anchor="middle" font-size="12" fill="#374151">Export ChromaDB &#8594; JSONL</text>
+  <text x="755" y="344" text-anchor="middle" font-size="12" fill="#374151">Backup / restore via private GitHub repo</text>
+  <text x="755" y="364" text-anchor="middle" font-size="10.5" fill="#6B7280">Safe push &#183; never overwrites another device's backup</text>
+
+  <!-- arrow chroma -> storage -->
+  <line x1="290" y1="390" x2="290" y2="438" stroke="#6B7280" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="305" y="418" font-size="10.5" fill="#6B7280">read / index</text>
+
+  <!-- arrow memory-backup <-> storage (bidirectional) -->
+  <line x1="660" y1="390" x2="610" y2="438" stroke="#6B7280" stroke-width="2" marker-end="url(#arrowBi)" marker-start="url(#arrowBi)"/>
+  <text x="628" y="420" font-size="10" fill="#6B7280">read to back up / write to restore</text>
+
+  <!-- arrow memory-backup <-> github (bidirectional) -->
+  <line x1="845" y1="390" x2="845" y2="468" stroke="#6B7280" stroke-width="2" marker-end="url(#arrowBi)" marker-start="url(#arrowBi)"/>
+  <text x="858" y="430" font-size="10.5" fill="#6B7280">push &#8644; pull</text>
+
+  <!-- Row D: Local Storage container -->
+  <rect x="70" y="440" width="600" height="170" rx="10" fill="#FAFAFA" stroke="#9CA3AF" stroke-width="1.2" stroke-dasharray="5,4"/>
+  <text x="90" y="458" font-size="11.5" font-weight="700" fill="#4B5563">Local Storage</text>
+
+  <!-- Hot store -->
+  <rect x="95" y="468" width="260" height="122" rx="8" fill="#FEF2F2" stroke="#DC2626" stroke-width="1.5"/>
+  <text x="225" y="494" text-anchor="middle" font-size="13" font-weight="700" fill="#991B1B">Hot Store</text>
+  <text x="225" y="514" text-anchor="middle" font-size="11" fill="#374151">knowledge-base/*.md</text>
+  <text x="225" y="532" text-anchor="middle" font-size="11" fill="#374151">experience/*.md</text>
+  <text x="225" y="554" text-anchor="middle" font-size="10" fill="#6B7280">Curated &#183; keyword-indexed</text>
+
+  <!-- Cold store -->
+  <rect x="385" y="468" width="260" height="122" rx="8" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5"/>
+  <text x="515" y="494" text-anchor="middle" font-size="13" font-weight="700" fill="#1E3A8A">Cold Store</text>
+  <text x="515" y="514" text-anchor="middle" font-size="11" fill="#374151">cold-notes/raw.jsonl</text>
+  <text x="515" y="532" text-anchor="middle" font-size="11" fill="#374151">append-only &#183; instant write</text>
+  <text x="515" y="554" text-anchor="middle" font-size="10" fill="#6B7280">Refined into Hot Store once it accumulates</text>
+
+  <!-- GitHub box -->
+  <rect x="720" y="468" width="250" height="122" rx="8" fill="#F3F4F6" stroke="#24292E" stroke-width="1.5"/>
+  <text x="845" y="498" text-anchor="middle" font-size="13" font-weight="700" fill="#24292E">GitHub Private Repo</text>
+  <text x="845" y="520" text-anchor="middle" font-size="11" fill="#374151">knowledge-base/ + experience/</text>
+  <text x="845" y="538" text-anchor="middle" font-size="11" fill="#374151">+ chroma_export.jsonl</text>
+  <text x="845" y="560" text-anchor="middle" font-size="10" fill="#6B7280">Portable &#183; cross-device sync</text>
+
+  <!-- Footer -->
+  <text x="520" y="650" text-anchor="middle" font-size="11.5" fill="#9CA3AF">Super-Memory &#183; A self-evolving knowledge accumulation &amp; hybrid retrieval system</text>
+</svg>

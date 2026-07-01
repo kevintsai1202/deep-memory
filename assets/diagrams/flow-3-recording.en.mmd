@@ -1,0 +1,26 @@
+flowchart TD
+    In(["Continued from Diagram 2"]) --> Cold["Step 5.1　Cold Store: default write every turn, no confirmation<br/>write_cold.py --topic --content --tags --skill"]
+    Cold --> ColdSkip{"Nothing at all<br/>to record this turn?"}
+    ColdSkip -->|yes, skip| Hot
+    ColdSkip -->|no| DoCold["Write to cold-notes/raw.jsonl"]
+    DoCold --> Hot
+
+    Hot{"Step 5.2　Hot Store:<br/>task complete or user expressed satisfaction?"}
+    Hot -->|no| End(["End of turn"])
+    Hot -->|yes| Ask["Proactively ask:<br/>record this approach?"]
+    Ask --> Confirm{"User agrees?"}
+    Confirm -->|no| End
+    Confirm -->|yes| WriteType{"Cross-skill experience<br/>or general knowledge?"}
+    WriteType -->|skill-specific| WriteExp["Write to experience/skill-[id].md<br/>update experience/_index.json"]
+    WriteType -->|general/reusable| WriteKB["Write to knowledge-base/[category].md<br/>update knowledge-base/_index.json"]
+    WriteExp --> Remind
+    WriteKB --> Remind
+    Remind["Remind the user:<br/>① run update_db.py to rebuild the index<br/>② run backup.py to back up to GitHub"] --> End
+
+    classDef coldStyle fill:#EFF6FF,stroke:#2563EB,color:#1E3A8A
+    classDef hotStyle fill:#FEF2F2,stroke:#DC2626,color:#991B1B
+    classDef startEndStyle fill:#F5F3FF,stroke:#8B5CF6,color:#5B21B6
+
+    class Cold,ColdSkip,DoCold coldStyle
+    class Hot,Ask,Confirm,WriteType,WriteExp,WriteKB,Remind hotStyle
+    class In,End startEndStyle

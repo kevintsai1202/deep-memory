@@ -1,0 +1,37 @@
+flowchart TD
+    In(["承接流程圖一"]) --> Retrieval{"首輪或話題切換？"}
+    Retrieval -->|否| ReuseCache["沿用 last_matched_categories<br/>不重讀索引"]
+    Retrieval -->|是| Path1["Path 1：比對 knowledge-base/_index.json 關鍵詞"]
+
+    Path1 --> HitCount{"命中幾個分類？"}
+    HitCount -->|1~3 個| ReadFiles["直接讀取命中的 .md 檔案<br/>（依 entry 切段索引，非整份）"]
+    HitCount -->|0 個| ForceRAG["強制進入 Path 2"]
+    HitCount -->|超過 3 個| AlsoRAG["讀前3個＋也進入 Path 2<br/>（分類過廣的訊號）"]
+
+    ReadFiles --> RAGTrigger{"Path 2 觸發條件？<br/>單檔≥50KB／檔案總數≥25／<br/>跨領域問題／使用者明確要求搜尋"}
+    ForceRAG --> RunRAG
+    AlsoRAG --> RunRAG
+    RAGTrigger -->|命中任一| RunRAG["呼叫 search.py<br/>（可加 --skill/--tag 過濾）"]
+    RAGTrigger -->|都沒觸發| Done
+
+    RunRAG --> RAGFail{"指令失敗？<br/>（venv 未建立／缺模組）"}
+    RAGFail -->|是| Degrade["優雅降級：視為沒找到<br/>提醒一次即可，不重試不卡住"]
+    RAGFail -->|否| ScoreCheck{"有 rerank_score<br/>大於 0.35？"}
+    ScoreCheck -->|有| UseText["用 text 直接當 context<br/>⚠️不要另外用 Read 開原始檔案"]
+    ScoreCheck -->|沒有| ZeroHitCheck{"是 0 命中<br/>觸發的嗎？"}
+    Degrade --> ZeroHitCheck
+    ZeroHitCheck -->|是| DynClass["動態分類：<br/>建議新分類→問使用者→建檔並更新 index"]
+    ZeroHitCheck -->|否| NotFound["告知使用者：找不到相關記錄"]
+
+    UseText --> Done(("完成，進入 Step 5<br/>（見流程圖三）"))
+    DynClass --> Done
+    NotFound --> Done
+    ReuseCache --> Done
+
+    classDef decisionStyle fill:#FFFBEB,stroke:#D97706,color:#92400E
+    classDef ragStyle fill:#ECFDF5,stroke:#0D9488,color:#065F46
+    classDef startEndStyle fill:#F5F3FF,stroke:#8B5CF6,color:#5B21B6
+
+    class Retrieval,HitCount,RAGTrigger,RAGFail,ScoreCheck,ZeroHitCheck decisionStyle
+    class Path1,ReadFiles,ForceRAG,AlsoRAG,RunRAG,Degrade,UseText,DynClass,NotFound,ReuseCache ragStyle
+    class In,Done startEndStyle

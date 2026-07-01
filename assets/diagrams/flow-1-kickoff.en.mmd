@@ -1,0 +1,28 @@
+flowchart TD
+    Start(["User message"]) --> Boot{"First trigger<br/>this conversation?"}
+    Boot -->|yes| BootSteps["Step 0.5 Self-Bootstrap<br/>・Global rules reinforced?<br/>・knowledge-base empty?→suggest seed.py"]
+    Boot -->|no| Extract
+    BootSteps --> Extract
+
+    Extract["Step 1　Extract Keywords<br/>3-8 core terms; first 3 become topic_fingerprint"] --> TopicSwitch{"Step 2　Topic Switch?<br/>transition words／keyword diff≥40%／new-category request"}
+
+    TopicSwitch --> SkillUsed{"Step 3　Non-super-memory<br/>skill used this turn?"}
+
+    SkillUsed -->|no| NextStep4
+    SkillUsed -->|yes, already loaded| NextStep4
+    SkillUsed -->|yes, not yet loaded| ReadExpIndex["Read experience/_index.json"]
+    ReadExpIndex --> ExpFound{"skill-id found?"}
+    ExpFound -->|yes| LoadExp["Load experience/skill-[id].md<br/>mention in reply: experience loaded"]
+    ExpFound -->|no| MarkMissing["Add to missing_experience_skills<br/>ask at task end whether to record"]
+    LoadExp --> NextStep4
+    MarkMissing --> NextStep4
+
+    NextStep4(["Proceed to Step 4: Knowledge Retrieval<br/>(see Diagram 2)"])
+
+    classDef decisionStyle fill:#FFFBEB,stroke:#D97706,color:#92400E
+    classDef actionStyle fill:#EEF2FF,stroke:#4F46E5,color:#312E81
+    classDef startEndStyle fill:#F5F3FF,stroke:#8B5CF6,color:#5B21B6
+
+    class Boot,TopicSwitch,SkillUsed,ExpFound decisionStyle
+    class BootSteps,Extract,ReadExpIndex,LoadExp,MarkMissing actionStyle
+    class Start,NextStep4 startEndStyle

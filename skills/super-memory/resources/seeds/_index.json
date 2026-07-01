@@ -1,0 +1,36 @@
+{
+  "_version": 1,
+  "_description": "Super-Memory bundled seed knowledge-base index (synthesized from Mem0, MemGPT, and official Claude/GPT memory best practices)",
+  "categories": [
+    {
+      "id": "memory-management",
+      "file": "memory-management.md",
+      "title": "Core Memory Management Principles",
+      "keywords": ["memory", "knowledge management", "Mem0", "MemGPT", "episodic memory", "semantic memory", "procedural memory", "memory types"]
+    },
+    {
+      "id": "retrieval-patterns",
+      "file": "retrieval-patterns.md",
+      "title": "Knowledge Retrieval Strategy & RAG Patterns",
+      "keywords": ["RAG", "vector search", "semantic retrieval", "hybrid search", "reranker", "context", "context window"]
+    },
+    {
+      "id": "knowledge-organization",
+      "file": "knowledge-organization.md",
+      "title": "Knowledge Organization & Classification Architecture",
+      "keywords": ["classification", "knowledge base", "index", "taxonomy", "tiering", "tags", "schema"]
+    },
+    {
+      "id": "context-window-strategy",
+      "file": "context-window-strategy.md",
+      "title": "Context Window Management Strategy",
+      "keywords": ["context window", "token", "compression", "summarization", "truncation", "memory decay"]
+    },
+    {
+      "id": "ide-memory-locations",
+      "file": "ide-memory-locations.md",
+      "title": "AI Coding Tool Memory Location Quick Reference",
+      "keywords": ["Claude Code", "Codex", "Antigravity", "Cursor", "memory location", "memory path", "auto-memory", "knowledge items", "KI", "backup", "import"]
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+flowchart TD
+    Start(["使用者訊息"]) --> Boot{"本次對話<br/>第一次觸發？"}
+    Boot -->|是| BootSteps["Step 0.5　自我檢查<br/>・全域規則已加固？<br/>・knowledge-base 是否為空？→提示 seed.py"]
+    Boot -->|否| Extract
+    BootSteps --> Extract
+
+    Extract["Step 1　抽取關鍵詞<br/>3~8 個核心詞，取前3個為 topic_fingerprint"] --> TopicSwitch{"Step 2　話題切換？<br/>轉折詞／關鍵詞差異≥40%／要求新分類"}
+
+    TopicSwitch --> SkillUsed{"Step 3　這輪用了<br/>非 super-memory 技能？"}
+
+    SkillUsed -->|否| NextStep4
+    SkillUsed -->|是，已讀過| NextStep4
+    SkillUsed -->|是，尚未讀取| ReadExpIndex["讀 experience/_index.json"]
+    ReadExpIndex --> ExpFound{"找到 skill-id？"}
+    ExpFound -->|是| LoadExp["載入 experience/skill-[id].md<br/>回覆註明已讀取經驗"]
+    ExpFound -->|否| MarkMissing["記入 missing_experience_skills<br/>任務結束時主動詢問是否記錄"]
+    LoadExp --> NextStep4
+    MarkMissing --> NextStep4
+
+    NextStep4(["進入 Step 4：知識庫檢索<br/>（見流程圖二）"])
+
+    classDef decisionStyle fill:#FFFBEB,stroke:#D97706,color:#92400E
+    classDef actionStyle fill:#EEF2FF,stroke:#4F46E5,color:#312E81
+    classDef startEndStyle fill:#F5F3FF,stroke:#8B5CF6,color:#5B21B6
+
+    class Boot,TopicSwitch,SkillUsed,ExpFound decisionStyle
+    class BootSteps,Extract,ReadExpIndex,LoadExp,MarkMissing actionStyle
+    class Start,NextStep4 startEndStyle

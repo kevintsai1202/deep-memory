@@ -1,109 +1,143 @@
-# Auto‑Skill：AI 自我進化的知識積累系統
+# Super-Memory: A Self-Evolving Knowledge Accumulation & Hybrid Retrieval System
 
-![Auto‑Skill Flow](assets/auto-skill-flow.png)
+**English** | [繁體中文](README.zh-TW.md)
 
-這個技能是讓你的 AI Agent 不再是「用完即忘」的工具，而是越用越懂你的自進化「第二大腦」。
+> 💡 **Project note**: This project is a deep refactor and rename of the original **[auto-skill](https://github.com/toolsai/auto-skill)** project. We restructured it into a minimal, modular open-source skill pack, decoupled "code" from "data," and integrated local ChromaDB hybrid retrieval with BGE-Reranker re-ranking.
 
-Auto‑Skill 是一個為 AI Assistant 設計的元技能（Meta‑Skill）。它作為背景運行的知識系統，能在對話過程中自動檢索過往經驗、捕捉最佳實踐，並在任務成功時主動將「成功經驗」寫入你的私人知識庫並建立索引，聰明地減少 Tokens 消耗。你只需要照常提出需求，Auto‑Skill 就會在背景自動運作。
+![Super-Memory Flow](assets/super-memory-flow.en.svg)
 
----
+This skill turns your AI agent from a tool that forgets everything the moment a session ends into a self-evolving "second brain" that gets better the more you use it.
 
-## 核心亮點
-
-### 1. 真正的「越用越強」
-傳統的 Agent 對話結束即歸零。Auto‑Skill 透過核心循環（Core Loop），在每次對話中自動檢查關鍵字索引，若發現這是過去解決過的問題，會直接調用當時的「最佳解法」或「避坑指南」。
-
-### 2. 跨技能經驗層（Cross‑Skill Memory）
-當你呼叫其他特定 Skill（如 Coding、寫作、繪圖）時，Auto‑Skill 會自動檢查技能經驗庫。
-例如：當你調用 `remotion-video-gen` 時，它會主動提醒：「上次我們在做這個時，發現設定 FPS 30 會導致音畫不同步，建議改為 60。」
-
-### 3. 主動式經驗捕獲
-你不需要手動整理筆記。當 AI 偵測到任務圓滿完成，或你表達滿意時，它會主動詢問：
-
-> 「這次解決了 [問題]，我想把這個經驗記錄下來，下次遇到類似問題可以直接參考，你覺得可以嗎？」
-
-### 4. 結構化知識存儲
-採用輕量級的 JSON 索引 + Markdown 內容，人類可讀，機器好懂。
-- **General Knowledge**：通用流程、偏好、風格
-- **Skill Experience**：特定技能的參數、錯誤解法
-
-![autoload](assets/auto-upload-knowlege.png)
+Super-Memory is a meta-skill designed for AI assistants. It runs as a background knowledge system that automatically retrieves past experience during conversations, captures best practices, and — once a task succeeds — proactively writes the "successful approach" into your private knowledge base and indexes it, intelligently cutting down on token usage. You just keep working as usual; Super-Memory runs automatically in the background.
 
 ---
 
-## 運作邏輯（The Loop）
+## Core Highlights
 
-Auto‑Skill 在每一輪對話中執行嚴謹的 5 步循環：
+### 1. Genuinely Gets Stronger With Use
+Traditional agents reset to zero the moment a conversation ends. Super-Memory's Core Loop automatically checks a keyword index on every turn — if it recognizes a problem it has solved before, it directly recalls the "best solution" or "pitfall guide" from that time.
 
-1. **關鍵詞指紋 (Fingerprinting)**
-   從對話中提取核心關鍵詞，生成話題指紋。
+### 2. Cross-Skill Memory
+Whenever you invoke another specific skill (coding, writing, drawing, etc.), Super-Memory automatically checks its skill experience store.
+Example: when you invoke `remotion-video-gen`, it proactively reminds you: "Last time we worked on this, setting FPS to 30 caused audio/video desync — we recommend switching to 60."
 
-2. **話題切換偵測**
-   智能判斷用戶是否開啟新話題，決定是否重讀知識庫。
+### 3. Proactive Experience Capture
+You don't need to take notes by hand. When the AI detects that a task has been completed well, or you express satisfaction, it proactively asks:
 
-3. **經驗讀取 (Skill Experience)**
-   若使用了特定技能，強制檢查是否有過往的「踩坑紀錄」或「成功參數」。
+> "We just solved [problem]. I'd like to record this so we have it on hand next time something similar comes up — sound good?"
 
-4. **通用知識庫檢索 (Knowledge Base)**
-   根據任務類型自動比對索引，載入最佳實踐。
+### 4. Modular Skill Packaging & RAG Integration
+- **Separation of concerns**: private data folders and binary files are completely removed from the package; the code ships independently.
+- **Local hybrid retrieval**: integrates the `chroma-hybrid-search` sub-skill for local semantic + BM25 hybrid search, with CPU-based BGE-Reranker-base re-ranking.
+- **Hot/cold tiered storage**: frequently-used curated knowledge lives in the hot store (`knowledge-base/`, `experience/`); fresh, unrefined conversation notes land first in the cold store (`cold-notes/raw.jsonl`) and get refined into hot-store entries once enough accumulate.
 
-5. **主動記錄 (Write Back)**
-   在任務高完成度結束時，執行任務核心提取寫入。
+### 5. Cross-Device Portability & Safe Backup
+Integrates the `memory-backup` sub-skill: export your knowledge base and push it to your own private GitHub repo in one step; restore safely via `restore.py` on a new machine (by default it only fills in missing files and never overwrites existing ones). Before pushing, it automatically checks whether the remote is ahead, so devices never silently overwrite each other's backups.
 
 ---
 
-## 檔案結構與格式
+## How It Works (The Loop)
 
-### 1) 通用知識庫 (Knowledge Base)
-適用於：通用流程、個人偏好、決策邏輯。
+Super-Memory runs a disciplined 5-step loop on every conversation turn:
 
+1. **Keyword Fingerprinting**
+   Extracts core keywords from the conversation to generate a topic fingerprint.
+
+2. **Topic Switch Detection**
+   Intelligently determines whether the user has started a new topic, deciding whether the knowledge base needs to be re-read.
+
+3. **Experience Lookup (Skill Experience)**
+   If a specific skill was used, mandatorily checks for past "pitfall records" or "working parameters."
+
+4. **General Knowledge Base Retrieval**
+   Automatically matches the index based on task type and loads the relevant best practices.
+
+5. **Proactive Recording (Write Back)**
+   Once a task reaches a high degree of completion, extracts and writes back the core takeaway.
+
+**Full decision flow, split into three diagrams (kickoff → retrieval → recording):**
+
+![Diagram 1: Per-Turn Kickoff](assets/flow-1-kickoff.en.png)
+
+![Diagram 2: Step 4 Knowledge Retrieval](assets/flow-2-retrieval.en.png)
+
+![Diagram 3: Step 5 Recording](assets/flow-3-recording.en.png)
+
+*Mermaid source for these diagrams lives in `assets/diagrams/*.mmd`. Regenerate with: `mmdc -i assets/diagrams/flow-1-kickoff.en.mmd -o assets/flow-1-kickoff.en.png -b white -s 2 -w 1000` (swap the filename for each diagram).*
+
+---
+
+## File Structure & Format
+
+### 1) Skill Install Package (GitHub Release Pack)
 ```text
-knowledge-base/
-├── _index.json      # 關鍵詞索引
-├── design-rules.md  # 設計規範
-└── writing-tone.md  # 寫作語氣偏好
+skills/
+├── super-memory/
+│   ├── SKILL.md                 # Lead protocol and flow control
+│   ├── scripts/seed.py          # Installs the bundled seed knowledge base
+│   └── resources/                # Recording format & hot/cold rules (loaded on demand)
+├── chroma-hybrid-search/
+│   ├── SKILL.md                 # Hybrid retrieval sub-skill spec
+│   ├── requirements.txt         # Local AI dependency declarations
+│   └── scripts/
+│       ├── search.py            # RAG retrieval + rerank
+│       ├── update_db.py         # Local vector database init / update
+│       └── write_cold.py        # Instant write to the cold store (cold-notes/)
+└── memory-backup/
+    ├── SKILL.md                 # GitHub backup/restore sub-skill spec
+    └── scripts/
+        ├── backup.py            # Export and safely push to a private GitHub repo
+        ├── restore.py           # Restore the knowledge base from GitHub on any device
+        └── export_jsonl.py      # ChromaDB → portable JSONL export
 ```
 
-### 2) 技能經驗庫 (Skill Experience)
-適用於：記錄使用任何第三方技能時曾遇到的問題或解決方案。
-
+### 2) Private Data Store (created under your project after install)
 ```text
-experience/
-├── _index.json           # 技能索引
-└── skill-python-code.md  # Python 技能的專屬經驗
+your-project/
+├── knowledge-base/              # Hot store: curated, keyword-indexed
+│   ├── _index.json              # Keyword index
+│   └── backend-dev.md           # Your own domain-knowledge handbook
+├── experience/                  # Hot store: skill-specific pitfalls & lessons
+│   ├── _index.json              # Skill index
+│   └── skill-python-code.md     # Gotchas for a specific tool
+├── cold-notes/
+│   └── raw.jsonl                # Cold store: instant write, refined into the hot store once it accumulates
+├── chroma_hybrid_db/            # Locally-built ChromaDB binaries (indexes both hot and cold stores)
+└── backup/                      # memory-backup's staging area (its own git repo, pushed to GitHub)
 ```
 
 ---
 
-## 實戰演練
+## Usage
 
-**用戶：**「幫我用 Python 寫一個爬蟲抓取股價。」
+### Installation Model (pick one)
 
-**Auto‑Skill（內部運作）：**
-1. 提取任務關鍵詞：Python、爬蟲、股價
-2. 偵測技能調用 `skill-python-coding`
-3. 讀取經驗庫，發現紀錄：「上次抓股價被擋，改用 fake-useragent 解決」
-4. AI 回覆：「沒問題，我會直接加上 fake-useragent 來避免被擋。」
+| Model | Where the skills live | Command path | Best for |
+|---|---|---|---|
+| **In-project (default, simplest)** | Copy `skills/` into your project root | Use `skills/...` directly (matches every SKILL.md example) | A single project, want it portable |
+| **Global** | Copy to `~/.agents/skills/` (or your agent's skill library) | Point to that global path instead, and add `--workspace "<your-project>"` to every script call | Multiple projects sharing one skill install |
 
-**用戶：**「太棒了！這次一次就成功運行。」
+> All data directories (`knowledge-base/`, `experience/`, `chroma_hybrid_db/`) are always created under **your project**, regardless of where the skills themselves live — the scripts use `--workspace` (default: the current directory) to decide where to read/write.
 
-**任務完成後觸發記錄：**
-「這次我們用 fake-useragent 成功解決了反爬問題。我想把這個『針對金融網站的 Header 設定技巧』記錄到你的 Python 經驗庫中，下次寫爬蟲時我可以自動套用。你覺得可以嗎？」
+### Initialization Steps
 
----
+1. Pick an install model from the table above and place `skills/` accordingly.
+2. Initialize the virtual environment, install dependencies, seed the bundled knowledge base, and build the local vector index (**no need to activate — call the venv's Python directly**):
 
-## 如何使用
+   **Windows (PowerShell)**
+   ```powershell
+   python -m venv .venv
+   .venv\Scripts\python -m pip install -r skills/chroma-hybrid-search/requirements.txt
+   .venv\Scripts\python skills/super-memory/scripts/seed.py
+   .venv\Scripts\python skills/chroma-hybrid-search/scripts/update_db.py
+   ```
 
-1. 把 `auto-skill/` 放進你的技能目錄（例如 `~/.agents/skills/`）。
-2. 在終端輸入：
-   `npx skills add toolsai/auto-skill`
+   **Linux / macOS**
+   ```bash
+   python3 -m venv .venv
+   .venv/bin/python -m pip install -r skills/chroma-hybrid-search/requirements.txt
+   .venv/bin/python skills/super-memory/scripts/seed.py
+   .venv/bin/python skills/chroma-hybrid-search/scripts/update_db.py
+   ```
 
-開始對話，享受 AI 自進化的樂趣！
-
----
-
-## 作者（Author）
-
-- Prompt Case
-- Threads: [@prompt_case](https://www.threads.com/@prompt_case)
-- Patreon: [MattTrendsPromptEngineering](https://www.patreon.com/MattTrendsPromptEngineering)
+   `knowledge-base/` is created by `seed.py`; `experience/` and `cold-notes/` are created automatically the first time something is written to them — no manual `mkdir` needed.
