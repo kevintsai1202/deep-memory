@@ -29,3 +29,9 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 .DS_Store
+
+# Git worktrees (isolated implementation workspaces)
+.worktrees/
+
+# Throwaway fixtures/output from manual script verification
+.tmp-import-test/
