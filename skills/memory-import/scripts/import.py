@@ -301,7 +301,10 @@ def _merge_autoskill_half(input_dir, workspace, subdir, force, dry_run):
 
     added, skipped = 0, 0
     for cat in src_categories:
-        cat_id = cat.get("id") or cat.get("skill_id") or cat.get("skill-id")
+        if "id" in cat:
+            cat_id = cat.get("id")
+        else:
+            cat_id = cat.get("skill_id") or cat.get("skill-id")
         cat_file = cat.get("file")
         if not cat_id or not cat_file:
             print(f"[WARN] {subdir}: 略過缺少 id/file 的索引項目：{cat}")
@@ -349,11 +352,17 @@ def _merge_autoskill_half(input_dir, workspace, subdir, force, dry_run):
 
 def merge_autoskill(input_dir, workspace, force, dry_run):
     """安全合併舊 auto-skill 格式的 knowledge-base/ 與 experience/ 到本機（id 存在則預設跳過）"""
+    total_added = 0
     for subdir in ("knowledge-base", "experience"):
         added, skipped = _merge_autoskill_half(input_dir, workspace, subdir, force, dry_run)
+        total_added += added
         label = "DRY-RUN" if dry_run else "OK"
         verb = "會處理" if dry_run else "已合併"
         print(f"[{label}] {subdir}: {verb} {added} 筆，跳過 {skipped} 筆（已存在，未加 --force）")
+
+    if not dry_run and total_added:
+        print("[下一步] 執行 update_db.py 讓新內容可以被語意搜尋找到：")
+        print("  python skills/chroma-hybrid-search/scripts/update_db.py --workspace " + workspace)
 
 
 def main():
