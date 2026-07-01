@@ -12,7 +12,7 @@ description: "Use at the start of any task, whenever another skill is about to b
 >
 > All `skills/...` paths assume the skill pack lives inside your current project (project-local install). If you installed the skills globally (e.g. `~/.agents/skills/`), point to that location instead and add `--workspace "<your-project>"`.
 >
-> **Which scripts actually need `<PY>` (the venv):** only `search.py`, `update_db.py`, and `export_jsonl.py` — they import `chromadb`/`sentence-transformers`. `seed.py`, `write_cold.py`, `backup.py`, and `restore.py` use only Python's standard library: any available `python`/`python3` works for those, no venv or `pip install` required. This matters because cold-store writes (Step 5.1) start from turn one, often before the venv exists.
+> **Which scripts actually need `<PY>` (the venv):** only `search.py`, `update_db.py`, and `export_jsonl.py` — they import `chromadb`/`sentence-transformers`. `seed.py`, `write_cold.py`, `backup.py`, `restore.py`, and `memory-import/scripts/import.py` use only Python's standard library: any available `python`/`python3` works for those, no venv or `pip install` required. This matters because cold-store writes (Step 5.1) start from turn one, often before the venv exists.
 
 ## Core Loop (Steps 0–5)
 
@@ -50,6 +50,13 @@ Execute this step only the first time deep-memory is triggered in a conversation
      > # ② Vectorize seed content
      > <PY> skills/chroma-hybrid-search/scripts/update_db.py
      > ```
+     > "If you already have memory data from somewhere else — a ChatGPT memory export, Claude Code's own local memory files, or an old auto-skill project — you can bring it in with the `memory-import` skill instead of starting from scratch:"
+     > ```bash
+     > python skills/memory-import/scripts/import.py --source chatgpt --input <export.json> --dry-run
+     > python skills/memory-import/scripts/import.py --source claude-local --input <path-to-memory-dir> --dry-run
+     > python skills/memory-import/scripts/import.py --source autoskill --input <path-to-old-project> --dry-run
+     > ```
+     > "Drop `--dry-run` once the preview looks right. This is entirely optional and only runs when you point it at a path yourself — nothing is scanned automatically."
    - **If present** (not first run) → Skip this step and continue normally.
 
 ### 0. In-Conversation Cache (Not Shown to User)
