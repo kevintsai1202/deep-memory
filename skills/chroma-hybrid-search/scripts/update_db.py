@@ -64,6 +64,10 @@ def main():
         # Chroma 的陣列型 metadata 不允許空陣列，沒有標籤就整個欄位省略
         if doc.get("tags"):
             meta["tags"] = doc["tags"]
+        # 舊條目（改動前寫入的冷庫記錄）沒有 project，省略此欄位，
+        # 讓 search.py 篩選專案時能與「無專案」的舊資料區分開來
+        if doc.get("project"):
+            meta["project"] = doc["project"]
         metadatas.append(meta)
 
     # 清除孤立向量：來源 .md／raw.jsonl 條目被刪除或改名後，upsert 不會自動移除舊向量，

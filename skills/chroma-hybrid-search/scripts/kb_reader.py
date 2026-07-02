@@ -125,13 +125,19 @@ def read_cold_notes(base_dir):
                     f"標籤：{tags_str}\n"
                     f"內容：{entry.get('content', '')}"
                 )
-                docs.append({
+                doc = {
                     "path": f"cold-notes/raw.jsonl#L{i+1}",
                     "text": text,
                     "source": "cold",
                     "tags": entry.get("tags", []),
                     "skill": entry.get("skill", "general")
-                })
+                }
+                # project 欄位是後補的：寫入時間早於此改動的舊條目沒有這個 key，
+                # 這裡刻意用 entry.get() 而不給預設值，讓舊條目維持「不屬於任何專案」，
+                # 之後才能被 search.py 的「查無專案結果 → 退回全域搜尋」邏輯正確判斷
+                if entry.get("project"):
+                    doc["project"] = entry["project"]
+                docs.append(doc)
             except json.JSONDecodeError:
                 continue
     return docs

@@ -96,10 +96,12 @@ skills/
     └── scripts/import.py        # 匯入 ChatGPT／Claude 本機／舊 auto-skill 資料
 ```
 
-### 2) 私有資料庫（安裝後在使用者開發專案下建立）
+### 2) 私有資料庫（建立在使用者 home 目錄下，所有專案共用同一份）
+
+所有腳本的 `--workspace` 預設值都是 `~/.deep-memory`——是全機器所有專案共用的單一儲存區，不會在每個專案底下各自建立一份。若想讓特定專案擁有完全獨立的資料庫，可明確指定 `--workspace`（或設定 `DEEP_MEMORY_WORKSPACE` 環境變數）覆蓋預設值。
 
 ```text
-your-project/
+~/.deep-memory/
 ├── knowledge-base/              # 熱庫：人工精選、關鍵詞索引
 │   ├── _index.json              # 關鍵詞索引
 │   └── backend-dev.md           # 您的領域知識手冊
@@ -107,7 +109,9 @@ your-project/
 │   ├── _index.json              # 技能索引
 │   └── skill-python-code.md     # 特定工具的踩坑經驗
 ├── cold-notes/
-│   └── raw.jsonl                # 冷庫：即寫即用，累積到閾值後精煉升級至熱庫
+│   └── raw.jsonl                # 冷庫：即寫即用，累積到閾值後精煉升級至熱庫。
+│                                 # 每筆條目會自動標記 project 欄位（取自觸發指令當下的目錄名稱），
+│                                 # 讓 search.py 能先比對當前專案，找不到才退回全庫搜尋
 ├── chroma_hybrid_db/            # 本地編譯之 ChromaDB 二進位（熱庫＋冷庫皆會索引）
 └── backup/                      # memory-backup 暫存區（獨立 git 倉庫，推送至 GitHub）
 ```
@@ -125,7 +129,7 @@ your-project/
 | **快速安裝** | 用`npx skills add -g` 直接從 GitHub 抓進全域技能庫 | 使用全域路徑（例如 `~/.gemini/config/skills/...`） | 最快完成全域安裝的方式 |
 | **專案內**           | 把`skills/` 複製到專案根目錄                            | 直接用`skills/...`（各 SKILL.md 的範例即如此）                          | 單一專案、想要完全獨立與可攜 |
 
-> 所有資料目錄（`knowledge-base/`、`experience/`、`chroma_hybrid_db/`）一律建立在「你的專案」下（或全域指定路徑），與技能放哪無關——腳本透過 `--workspace`（預設為當前目錄）決定讀寫位置。
+> 所有資料目錄（`knowledge-base/`、`experience/`、`chroma_hybrid_db/`）一律建立在「你的 home 目錄」下（`~/.deep-memory`），與技能放哪、目前在哪個專案都無關——腳本透過 `--workspace`（預設為 `~/.deep-memory`，可用 `DEEP_MEMORY_WORKSPACE` 環境變數覆蓋）決定讀寫位置。這是所有專案共用的單一儲存區；冷庫條目會標記 `project` 欄位，讓檢索優先比對當前專案，找不到才退回全庫。
 
 #### 用 `npx skills add` 快速安裝
 
@@ -174,4 +178,13 @@ npx skills add kevintsai1202/deep-memory --skill deep-memory -a claude-code -g
    `knowledge-base/` 由 `seed.py` 自動建立；`experience/` 與 `cold-notes/` 則在第一次真正寫入時自動建立，不需手動 `mkdir`。
 
    > 若你是安裝在全域（推薦）或使用 `npx skills add -g` 安裝，請把上面的 `skills/...` 換成該工具實際放置的位置（例如 `~/.gemini/config/skills/...` 或 `~/.claude/skills/...`）。
-   >
+
+---
+
+## Changelog
+
+### 2026-07-02
+
+- 冷庫條目新增 `project` 欄位（取自觸發指令當下的目錄名稱自動標記）；`search.py` 會先比對當前專案，找不到符合結果才退回全庫搜尋。`search.py` 的回傳格式也從純陣列改成 `{"scope": "...", "results": [...]}`。
+- 這次改動前寫入的舊條目沒有 `project` 欄位，只會出現在退回全庫搜尋的那一次查詢——刻意不補標，維持歷史資料原樣。
+- 文件修正：本 README 先前把私有資料庫描述成「建立在你的專案下」，這是文件寫錯，實際上一直都是預設建立在 `~/.deep-memory`，並非這次才改變的行為。

@@ -38,6 +38,8 @@
 > ⚠️ **Important distinction: JSONL write ≠ vectorization**
 > - `write_cold.py` only appends the entry to `cold-notes/raw.jsonl` (text backup). **RAG cannot search this data yet.**
 > - You must separately run `update_db.py` to vectorize the cold store and make it RAG-searchable.
+>
+> **Global store, project-tagged entries:** `write_cold.py`, `update_db.py`, and `search.py` all default `--workspace` to `~/.deep-memory` — every project's memory lives in one shared home-directory store now, not scattered per-project. Each cold-store entry still records which project it came from via an auto-filled `project` field (derived from the calling directory's name), so `search.py` can search the current project first and only fall back to the full store when nothing project-specific matches. Entries written before this change have no `project` field and are reachable only through that fallback pass — they were intentionally left as-is, not backfilled.
 
 ---
 

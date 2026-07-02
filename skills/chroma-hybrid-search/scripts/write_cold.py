@@ -23,6 +23,7 @@ def main():
         default_ws = os.path.join(os.path.expanduser("~"), ".deep-memory")
 
     parser.add_argument("--workspace",  type=str, default=default_ws, help="工作目錄根路徑")
+    parser.add_argument("--project",    type=str, default=None, help="本條記錄所屬的專案名稱；未指定時自動取當前工作目錄（os.getcwd()）的資料夾名稱")
     parser.add_argument("--topic",      type=str, required=True,  help="本條記錄的主題（一句話）")
     parser.add_argument("--content",    type=str, required=True,  help="詳細內容（可包含步驟、程式碼片段等）")
     parser.add_argument("--tags",       type=str, default="",     help="逗號分隔的標籤（如 backend,fastapi,session）")
@@ -38,6 +39,10 @@ def main():
 
     jsonl_path = os.path.join(cold_dir, "raw.jsonl")
 
+    # 專案名稱：未顯式指定時，以「實際觸發指令當下的工作目錄」推斷（而非 base_dir，
+    # 因為 base_dir 現在固定指向 home 的全域儲存區，不同專案都寫進同一份檔案）
+    project = args.project or os.path.basename(os.getcwd())
+
     # 建立條目
     entry = {
         "date":    datetime.now().strftime("%Y-%m-%d"),
@@ -46,6 +51,7 @@ def main():
         "content": args.content,
         "tags":    [t.strip() for t in args.tags.split(",") if t.strip()],
         "skill":   args.skill,
+        "project": project,
         "quality": args.quality
     }
 
@@ -57,7 +63,7 @@ def main():
     with open(jsonl_path, "r", encoding="utf-8") as f:
         count = sum(1 for line in f if line.strip())
 
-    print(f"[OK] 冷庫已寫入：{args.topic}")
+    print(f"[OK] 冷庫已寫入：{args.topic}（專案：{project}）")
     print(f"[INFO] 冷庫目前共 {count} 筆條目")
 
     # 精煉提醒閾值：≥ 20 筆時提醒（憑經驗選擇的中間值——夠小才不會讓冷庫無限累積

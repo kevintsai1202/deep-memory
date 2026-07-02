@@ -94,9 +94,10 @@ skills/
     └── scripts/import.py        # Imports ChatGPT / Claude local / legacy auto-skill data
 ```
 
-### 2) Private Data Store (created under your project after install)
+### 2) Private Data Store (created under your home directory, shared by every project)
+All scripts default `--workspace` to `~/.deep-memory` — one store for every project on the machine, not a folder created inside each project. Set `--workspace` (or the `DEEP_MEMORY_WORKSPACE` env var) explicitly if you want a project to keep a fully isolated store instead.
 ```text
-your-project/
+~/.deep-memory/
 ├── knowledge-base/              # Hot store: curated, keyword-indexed
 │   ├── _index.json              # Keyword index
 │   └── backend-dev.md           # Your own domain-knowledge handbook
@@ -104,7 +105,9 @@ your-project/
 │   ├── _index.json              # Skill index
 │   └── skill-python-code.md     # Gotchas for a specific tool
 ├── cold-notes/
-│   └── raw.jsonl                # Cold store: instant write, refined into the hot store once it accumulates
+│   └── raw.jsonl                # Cold store: instant write, refined into the hot store once it accumulates.
+│                                 # Each entry auto-tags a `project` field (from the calling directory's name)
+│                                 # so search.py can look at the current project before falling back to everything.
 ├── chroma_hybrid_db/            # Locally-built ChromaDB binaries (indexes both hot and cold stores)
 └── backup/                      # memory-backup's staging area (its own git repo, pushed to GitHub)
 ```
@@ -121,7 +124,7 @@ your-project/
 | **Quick install** | `npx skills add -g` fetches straight from GitHub into your global agent skill library | Use global paths (e.g., `~/.gemini/config/skills/...`) | Fastest way to get started with global installation |
 | **In-project** | Copy `skills/` into your project root | Use `skills/...` directly (matches every SKILL.md example) | Single project use-case, want it fully self-contained |
 
-> All data directories (`knowledge-base/`, `experience/`, `chroma_hybrid_db/`) are always created under **your project** (or a globally configured path if configured), regardless of where the skills themselves live — the scripts use `--workspace` (default: the current directory) to decide where to read/write.
+> All data directories (`knowledge-base/`, `experience/`, `chroma_hybrid_db/`) are always created under **your home directory** (`~/.deep-memory`), regardless of where the skills themselves live or which project you're in — the scripts use `--workspace` (default: `~/.deep-memory`, overridable via `DEEP_MEMORY_WORKSPACE`) to decide where to read/write. This single store is shared across every project; cold-store entries carry a `project` field so retrieval favors the current project before falling back to everything else.
 
 #### Quick Install with `npx skills add`
 
@@ -170,3 +173,13 @@ This only places the skill files — you still need to run the Python initializa
    `knowledge-base/` is created by `seed.py`; `experience/` and `cold-notes/` are created automatically the first time something is written to them — no manual `mkdir` needed.
 
    > If you installed globally (recommended) or via `npx skills add -g`, swap `skills/...` in the commands above for the actual path where the files were placed (typically `~/.gemini/config/skills/...` or `~/.claude/skills/...`).
+
+---
+
+## Changelog
+
+### 2026-07-02
+
+- Cold-store entries now auto-tag a `project` field (derived from the calling directory's name); `search.py` searches the current project first and only falls back to the full store when nothing project-specific matches. `search.py`'s output shape changed from a bare array to `{"scope": "...", "results": [...]}`.
+- Entries written before this change have no `project` field and are only reachable via the fallback pass — they were intentionally left as-is, not backfilled.
+- Documentation fix: this README previously described the private data store as being created under your project directory. It was already always created under `~/.deep-memory` by default — that part of the docs was simply wrong, not a behavior change.
