@@ -858,6 +858,17 @@
         </div>
       </div>
 
+      <!-- 更新紀錄 (Changelog) -->
+      <div class="section" style="max-width: 760px; margin: 0 auto; padding: 0 32px 48px;">
+        <div class="mono" style="color: var(--text-muted); font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 16px; text-align: center;">{{t.changelog_badge}}</div>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; gap: 16px; font-size: 13.5px; line-height: 1.6;">
+            <span class="mono" style="color: var(--text-muted); flex-shrink: 0; width: 88px;">{{t.changelog_v1_date}}</span>
+            <span style="color: var(--text-secondary);">{{t.changelog_v1_desc}}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- 行動呼籲區 (CTA Section) -->
       <div class="section"
         style="max-width: 960px; margin: 0 auto; padding: var(--section-padding) 32px 140px; text-align: center;">
@@ -957,9 +968,13 @@ const T = {
     storage_card_hot_desc: "冷資料經過精煉後，轉化為結構化的 `.md` 知識庫與技能踩坑日誌，由本機向量檢索快速配對，直接注入 Agent 上下文。",
     storage_card_hot_status: "RAG 已就緒",
     
+    changelog_badge: "更新紀錄",
+    changelog_v1_date: "2026-07-02",
+    changelog_v1_desc: "冷庫條目新增 `project` 欄位（依觸發指令當下的目錄名稱自動標記）；搜尋時會先比對當前專案，找不到才退回全庫搜尋。所有專案仍共用同一份 `~/.deep-memory` 儲存區，未曾改為各專案獨立存放。",
+
     cta_title: "告別每次從零開始的對話",
     cta_desc: "數分鐘內完成配置，讓您的 AI Agent 擁有持久化記憶，無須手動記筆記。",
-    
+
     footer_license: "Deep-Memory · MIT 授權條款",
     footer_desc: "基於 auto-skill 的深度重構版本"
   },
@@ -1037,9 +1052,13 @@ const T = {
     storage_card_hot_desc: "A curated folder of structured `.md` categories and skill pitfall logs, indexed by keywords for rapid, automatic injection.",
     storage_card_hot_status: "RAG Ready",
     
+    changelog_badge: "Changelog",
+    changelog_v1_date: "2026-07-02",
+    changelog_v1_desc: "Cold-store entries now auto-tag a `project` field (from the calling directory's name). Search checks the current project first, falling back to the full store only when nothing project-specific matches. Storage remains a single shared `~/.deep-memory` store across all projects — it was never per-project.",
+
     cta_title: "Stop starting from zero.",
     cta_desc: "Install it in your project in minutes — no manual note-taking required.",
-    
+
     footer_license: "Deep-Memory · MIT License",
     footer_desc: "A deep refactor of auto-skill"
   }
