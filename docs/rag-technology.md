@@ -239,6 +239,18 @@ flowchart LR
 - `.venv/` 與 `chroma_hybrid_db/` 皆為本機產物，**不得提交到 Git**。
 - `search.py` 執行失敗（venv 未建、模組缺失）時，視同「查無結果」繼續對話，不阻塞、不重試。
 
+### 7.1 安全性說明：ChromaDB pre-auth RCE（Dependabot alert #1）
+
+GitHub Dependabot 對 `chromadb >= 1.0.0, <= 1.5.9` 回報一個 Critical（CVSS 9.3）弱點：ChromaDB 以**伺服器模式**執行時，未認證的攻擊者可透過 `/api/v2/tenants/{tenant}/databases/{db}/collections` 端點，用惡意模型 repo + `trust_remote_code=true` 執行任意程式碼。
+
+**評估結論：本系統不受影響**，理由如下（供日後看到 alert 的人免重新分析）：
+
+1. **嵌入式模式**：所有腳本都用 `chromadb.PersistentClient(path=...)`——ChromaDB 只是行程內函式庫，直接讀寫本機 SQLite，**從未啟動 HTTP 伺服器**，有漏洞的 API 端點不存在於任何網路介面。
+2. **不使用模型下載路徑**：向量一律由 `onnx_models.py` 自行計算後以 `embeddings=`／`query_embeddings=` 傳入，Chroma 的 embedding function／模型下載機制（弱點所在的程式路徑）完全不會執行。
+3. 攻擊前提是能對 Chroma 伺服器發網路請求——本架構下該前提不成立。
+
+**紅線**：永遠不要用 `chroma run` 等方式把 `chroma_hybrid_db/` 跑成對外服務。**後續**：官方尚未釋出修復版（patched = None）；alert 保留不關閉，作為修復版釋出後的升級提醒。
+
 ---
 
 ## 8. 設計取捨摘要
