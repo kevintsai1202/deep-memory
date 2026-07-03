@@ -864,6 +864,10 @@
         <div class="mono" style="color: var(--text-muted); font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 16px; text-align: center;">{{t.changelog_badge}}</div>
         <div style="display: flex; flex-direction: column; gap: 12px;">
           <div style="display: flex; gap: 16px; font-size: 13.5px; line-height: 1.6;">
+            <span class="mono" style="color: var(--text-muted); flex-shrink: 0; width: 88px;">{{t.changelog_v2_date}}</span>
+            <span style="color: var(--text-secondary);">{{t.changelog_v2_desc}}</span>
+          </div>
+          <div style="display: flex; gap: 16px; font-size: 13.5px; line-height: 1.6;">
             <span class="mono" style="color: var(--text-muted); flex-shrink: 0; width: 88px;">{{t.changelog_v1_date}}</span>
             <span style="color: var(--text-secondary);">{{t.changelog_v1_desc}}</span>
           </div>
@@ -970,6 +974,8 @@ const T = {
     storage_card_hot_status: "RAG 已就緒",
     
     changelog_badge: "更新紀錄",
+    changelog_v2_date: "2026-07-03",
+    changelog_v2_desc: "RAG 推論引擎改為 ONNX Runtime 直接推論（不再依賴 PyTorch）：索引更新 21 秒 → 1 秒、語意檢索 20 秒 → 7 秒、安裝體積 3 GB → 200 MB；檢索結果與 0.35 門檻完全不變，既有索引自動遷移免重建。另新增增量索引（只重算新增／變動條目）與精煉流程第 7 步（重建後抽查驗證）。",
     changelog_v1_date: "2026-07-02",
     changelog_v1_desc: "冷庫條目新增 `project` 欄位（依觸發指令當下的目錄名稱自動標記）；搜尋時會先比對當前專案，找不到才退回全庫搜尋。所有專案仍共用同一份 `~/.deep-memory` 儲存區，未曾改為各專案獨立存放。",
 
@@ -1054,6 +1060,8 @@ const T = {
     storage_card_hot_status: "RAG Ready",
     
     changelog_badge: "Changelog",
+    changelog_v2_date: "2026-07-03",
+    changelog_v2_desc: "RAG inference now runs directly on ONNX Runtime (no PyTorch): index updates 21s -> 1s, semantic search 20s -> 7s, install footprint 3 GB -> 200 MB. Retrieval results and the 0.35 threshold are unchanged; existing indexes migrate automatically. Also adds incremental indexing (only new/changed entries are re-embedded) and refinement step 7 (post-rebuild search spot-check).",
     changelog_v1_date: "2026-07-02",
     changelog_v1_desc: "Cold-store entries now auto-tag a `project` field (from the calling directory's name). Search checks the current project first, falling back to the full store only when nothing project-specific matches. Storage remains a single shared `~/.deep-memory` store across all projects — it was never per-project.",
 
