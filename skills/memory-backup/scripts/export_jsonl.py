@@ -9,7 +9,6 @@ import sys
 import json
 import argparse
 import chromadb
-from chromadb.utils import embedding_functions
 
 # Force UTF-8 stdout on Windows
 if hasattr(sys.stdout, 'reconfigure'):
@@ -37,13 +36,9 @@ def main():
     # 確保輸出目錄存在
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    # 初始化 ChromaDB（不帶 embedding function，僅讀取已存在的向量庫資料）
-    embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="intfloat/multilingual-e5-small",
-        device="cpu"
-    )
+    # 初始化 ChromaDB（不帶 embedding function：純讀取不需要計算向量）
     client = chromadb.PersistentClient(path=db_path)
-    collection = client.get_or_create_collection("hybrid_docs", embedding_function=embedding_fn)
+    collection = client.get_or_create_collection("hybrid_docs")
 
     # 取出所有條目（不含向量本身，節省儲存空間）
     results = collection.get(include=["documents", "metadatas"])

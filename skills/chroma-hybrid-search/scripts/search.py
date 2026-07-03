@@ -5,10 +5,9 @@ import argparse
 import json
 import re
 import chromadb
-from chromadb.utils import embedding_functions
 from rank_bm25 import BM25Okapi
-from sentence_transformers import CrossEncoder
 from kb_reader import read_knowledge_base, read_cold_notes
+from onnx_models import E5OnnxEmbeddingFunction, OnnxReranker
 
 # Force UTF-8 stdout encoding on Windows
 if hasattr(sys.stdout, 'reconfigure'):
@@ -36,7 +35,7 @@ def rrf(vector_ranked, bm25_ranked, k=60):
         rrf_scores[doc_id] = rrf_scores.get(doc_id, 0.0) + 1.0 / (k + (rank + 1))
     return rrf_scores
 
-def run_search(docs, collection, args, extra_where=None):
+def run_search(docs, collection, args, query_embedding=None, extra_where=None):
     """對給定的 docs 子集執行一次完整的 vector + BM25 + RRF + rerank 檢索，回傳 retrieved_docs 列表"""
     if not docs:
         return []
@@ -54,7 +53,7 @@ def run_search(docs, collection, args, extra_where=None):
     vector_ranked = []
     if args.mode in ["hybrid-rerank", "hybrid", "vector"]:
         vector_res = collection.query(
-            query_texts=[args.query],
+            query_embeddings=query_embedding,
             n_results=min(args.candidate_limit, len(docs)),
             where=where
         )
@@ -92,7 +91,7 @@ def run_search(docs, collection, args, extra_where=None):
 
     # 4. Reranking (optional)
     if args.mode == "hybrid-rerank" and candidates:
-        reranker = CrossEncoder("BAAI/bge-reranker-base", device="cpu")
+        reranker = OnnxReranker()
         pairs = [[args.query, doc_map[path]["text"]] for path in candidates if path in doc_map]
 
         if pairs:
@@ -158,12 +157,14 @@ def main():
     db_path = os.path.join(base_dir, "chroma_hybrid_db")
 
     # Initialize ChromaDB
-    embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="intfloat/multilingual-e5-small",
-        device="cpu"
-    )
+    # 不把 embedding function 綁在 collection 上（避免與既有 collection 持久化的
+    # EF 設定衝突）；query 向量在此先算好，兩段式檢索（專案優先→全庫）共用同一份
     client = chromadb.PersistentClient(path=db_path)
-    collection = client.get_or_create_collection("hybrid_docs", embedding_function=embedding_fn)
+    collection = client.get_or_create_collection("hybrid_docs")
+    query_embedding = None
+    if args.mode in ["hybrid-rerank", "hybrid", "vector"]:
+        # embedding 走輕量 ONNX 路徑（不載入 torch，見 onnx_models.py）
+        query_embedding = E5OnnxEmbeddingFunction()([args.query])
 
     # 專案篩選：先縮小到當前專案的條目再搜，找不到符合的結果才退回全庫搜尋
     # （沒有 project 欄位的舊條目或熱庫條目視為「不屬於任何專案」，只會出現在退回全庫的那次搜尋）
@@ -174,12 +175,12 @@ def main():
     if project and project.lower() != "all":
         project_docs = [d for d in all_docs if d.get("project") == project]
         if project_docs:
-            retrieved_docs = run_search(project_docs, collection, args, extra_where={"project": project})
+            retrieved_docs = run_search(project_docs, collection, args, query_embedding, extra_where={"project": project})
             if retrieved_docs:
                 scope = f"project:{project}"
 
     if not retrieved_docs:
-        retrieved_docs = run_search(all_docs, collection, args)
+        retrieved_docs = run_search(all_docs, collection, args, query_embedding)
         scope = "all" if scope == "all" else f"{scope} -> all (fallback, no project match)"
 
     print(json.dumps({"scope": scope, "results": retrieved_docs}, ensure_ascii=False, indent=2))
