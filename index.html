@@ -564,7 +564,8 @@
             <div
               style="background: var(--bg-primary); border: 1px solid rgba(255,255,255,0.03); border-radius: 8px; padding: 12px 16px; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); line-height: 1.5;">
               <span style="color: var(--brand-color);">Local RAG Engine:</span> ChromaDB + BM25<br />
-              <span style="color: #60a5fa;">Reranker:</span> CPU SentenceTransformers<br />
+              <span style="color: #60a5fa;">Inference:</span> ONNX Runtime (no PyTorch)<br />
+              <span style="color: #34d399;">Cold Start:</span> ~1s index &middot; ~7s search<br />
               <span style="color: var(--text-muted);">100% Private &amp; Offline Ready</span>
             </div>
           </div>
@@ -925,7 +926,7 @@ const T = {
     
     features_card3_tag: "Offline Search",
     features_card3_title: "本機 RAG 混合檢索",
-    features_card3_desc: "整合本機 ChromaDB 向量檢索與 BM25 關鍵字檢索，並經由 CPU 進行重排（Rerank）。無須連接外部雲端資料庫，確保您的代碼隱私安全。",
+    features_card3_desc: "整合本機 ChromaDB 向量檢索與 BM25 關鍵字檢索，並經由 CPU 進行重排（Rerank）。推論改採 ONNX Runtime 輕量引擎——不需 PyTorch，索引更新約 1 秒、完整檢索約 7 秒，安裝體積從 3 GB 縮至 200 MB。無須連接外部雲端資料庫，確保您的代碼隱私安全。",
     
     features_card4_tag: "Sync & Backup",
     features_card4_title: "跨系統同步與安全備份",
@@ -944,7 +945,7 @@ const T = {
     arch_cold: "Cold Store",
     arch_cold_sub: "raw.jsonl (Append-only)",
     arch_rag: "Local RAG Search",
-    arch_rag_sub: "ChromaDB 向量檢索",
+    arch_rag_sub: "ChromaDB ・ BM25 ・ ONNX Runtime",
     arch_github_top: "私有",
     arch_github_bottom: "GitHub",
     arch_github_sub: "同步備份目標",
@@ -1009,7 +1010,7 @@ const T = {
     
     features_card3_tag: "Offline Search",
     features_card3_title: "Local hybrid retrieval",
-    features_card3_desc: "Combines ChromaDB vector search with BM25 keyword matching, reranked locally on CPU. No external cloud connections needed, keeping your code fully private.",
+    features_card3_desc: "Combines ChromaDB vector search with BM25 keyword matching, reranked locally on CPU. Inference runs on the lightweight ONNX Runtime — no PyTorch required: index updates in ~1s, full retrieval in ~7s, and the install footprint shrinks from 3 GB to 200 MB. No external cloud connections needed, keeping your code fully private.",
     
     features_card4_tag: "Sync & Backup",
     features_card4_title: "Cross-system sync & safe backup",
@@ -1028,7 +1029,7 @@ const T = {
     arch_cold: "Cold Store",
     arch_cold_sub: "raw.jsonl (Append-only)",
     arch_rag: "Local RAG Search",
-    arch_rag_sub: "ChromaDB + BM25",
+    arch_rag_sub: "ChromaDB + BM25 + ONNX Runtime",
     arch_github_top: "Private",
     arch_github_bottom: "GitHub",
     arch_github_sub: "Sync Target",
