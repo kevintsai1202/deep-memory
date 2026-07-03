@@ -45,7 +45,7 @@
 
 ## Cold Store Vectorization (When to Run update_db.py)
 
-`update_db.py` indexes both the hot store (MD files) and cold store (raw.jsonl). It has a non-trivial compute cost (re-vectorizes all documents), so **it should NOT be triggered after every write**. Use the following rules:
+`update_db.py` indexes both the hot store (MD files) and cold store (raw.jsonl). Indexing is **incremental**: it only re-embeds entries that are new or whose text changed, updates metadata-only changes without re-embedding, and skips unchanged entries. Embedding runs on a lightweight ONNX path (`onnx_models.py`, no torch), and the model only loads when something actually needs re-embedding — a no-change run finishes in about 1 second. It is still good hygiene **not to trigger it after every write**; use the following rules:
 
 | When to Vectorize | Reason |
 |---|---|
@@ -109,6 +109,18 @@ If the cold store has entries written since the last `update_db.py` run, a RAG q
    > "I've organized [N] entries on [topic] from the cold store. Here's the distilled draft — shall I write this to the hot store?"
 5. **Write to hot store** after confirmation — update the corresponding MD file and `_index.json`
 6. **Mark cold store entries**: Tag refined entries with `"quality": "reviewed"` (do not delete — preserve history)
+7. **Rebuild the index and spot-check (verification — refinement is NOT complete without this)**:
+   run `update_db.py` to re-index, then verify retrieval with a `search.py` query using
+   keywords from at least one newly written hot-store entry:
+
+   ```bash
+   <PY> skills/chroma-hybrid-search/scripts/update_db.py
+   <PY> skills/chroma-hybrid-search/scripts/search.py --query "keywords from a new hot-store entry" --limit 3 --min-score 0.35
+   ```
+
+   The new entry must appear in the results. If it doesn't, the index did not pick it up —
+   check that the entry uses the `## 🔧` heading format, then re-run the rebuild. Do not
+   report the refinement as done until the spot-check passes.
 
 ---
 

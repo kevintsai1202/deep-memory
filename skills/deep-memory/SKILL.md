@@ -19,7 +19,7 @@ description: "Use at the start of any task, whenever another skill is about to b
 > - If you want to use a specific directory, set the `DEEP_MEMORY_WORKSPACE` environment variable (e.g., `DEEP_MEMORY_WORKSPACE="."` or `DEEP_MEMORY_WORKSPACE="D:\my-memories"`).
 > - You can also pass `--workspace <path>` to any script to override the workspace path for that specific command.
 >
-> **Which scripts actually need `<PY>` (the venv):** only `search.py`, `update_db.py`, and `export_jsonl.py` — they import `chromadb`/`sentence-transformers`. `seed.py`, `write_cold.py`, `backup.py`, `restore.py`, and `memory-import/scripts/import.py` use only Python's standard library: any available `python`/`python3` works for those, no venv or `pip install` required. This matters because cold-store writes (Step 5.1) start from turn one, often before the venv exists.
+> **Which scripts actually need `<PY>` (the venv):** only `search.py`, `update_db.py`, and `export_jsonl.py` — they import `chromadb`/`onnxruntime`. `seed.py`, `write_cold.py`, `backup.py`, `restore.py`, and `memory-import/scripts/import.py` use only Python's standard library: any available `python`/`python3` works for those, no venv or `pip install` required. This matters because cold-store writes (Step 5.1) start from turn one, often before the venv exists.
 
 ## Core Loop (Steps 0–5)
 
