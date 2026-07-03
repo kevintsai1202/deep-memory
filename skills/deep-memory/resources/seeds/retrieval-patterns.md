@@ -57,9 +57,9 @@ Hybrid search = fusing **keyword search (BM25) + vector search (Dense)** results
 **deep-memory configuration:**
 ```bash
 # Use hybrid search + reranker, taking the Top-3 results
-# Windows:        .venv\Scripts\python skills/chroma-hybrid-search/scripts/search.py --query "question" --limit 3
-# Linux / macOS:  .venv/bin/python   skills/chroma-hybrid-search/scripts/search.py --query "question" --limit 3
-# Only adopt results where rerank_score > 0.35
+# Windows (PowerShell): & "$HOME\.deep-memory\.venv\Scripts\python" skills/chroma-hybrid-search/scripts/search.py --query "question" --limit 3 --min-score 0.35
+# Linux / macOS:        ~/.deep-memory/.venv/bin/python skills/chroma-hybrid-search/scripts/search.py --query "question" --limit 3 --min-score 0.35
+# --min-score 0.35 filters search-side, which also lets the project-first pass fall back to the full store
 ```
 
 ---

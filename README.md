@@ -147,7 +147,7 @@ npx skills add kevintsai1202/deep-memory --skill deep-memory -a claude-code -g
 > Adding `-g` installs the skills into your global skill library (e.g. `~/.gemini/config/skills/` or `~/.claude/skills/`), making them available across all your workspaces.
 > `--all` installs into **every** agent the CLI recognizes (Claude Code, Cursor, Codex, etc.). Use `-a <agent-name> -g` if you only want it in a specific agent's global path.
 
-This only places the skill files — you still need to run the Python initialization steps below once per project workspace.
+This only places the skill files — you still need to run the Python initialization steps below, once per machine (the venv and all data live in the global `~/.deep-memory` workspace, shared by every project).
 
 ### Initialization Steps
 
@@ -156,18 +156,18 @@ This only places the skill files — you still need to run the Python initializa
 
    **Windows (PowerShell)**
    ```powershell
-   python -m venv .venv
-   .venv\Scripts\python -m pip install -r skills/chroma-hybrid-search/requirements.txt
-   .venv\Scripts\python skills/deep-memory/scripts/seed.py
-   .venv\Scripts\python skills/chroma-hybrid-search/scripts/update_db.py
+   python -m venv "$HOME\.deep-memory\.venv"
+   & "$HOME\.deep-memory\.venv\Scripts\python" -m pip install -r skills/chroma-hybrid-search/requirements.txt
+   & "$HOME\.deep-memory\.venv\Scripts\python" skills/deep-memory/scripts/seed.py
+   & "$HOME\.deep-memory\.venv\Scripts\python" skills/chroma-hybrid-search/scripts/update_db.py
    ```
 
    **Linux / macOS**
    ```bash
-   python3 -m venv .venv
-   .venv/bin/python -m pip install -r skills/chroma-hybrid-search/requirements.txt
-   .venv/bin/python skills/deep-memory/scripts/seed.py
-   .venv/bin/python skills/chroma-hybrid-search/scripts/update_db.py
+   python3 -m venv ~/.deep-memory/.venv
+   ~/.deep-memory/.venv/bin/python -m pip install -r skills/chroma-hybrid-search/requirements.txt
+   ~/.deep-memory/.venv/bin/python skills/deep-memory/scripts/seed.py
+   ~/.deep-memory/.venv/bin/python skills/chroma-hybrid-search/scripts/update_db.py
    ```
 
    `knowledge-base/` is created by `seed.py`; `experience/` and `cold-notes/` are created automatically the first time something is written to them — no manual `mkdir` needed.

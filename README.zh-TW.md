@@ -152,7 +152,7 @@ npx skills add kevintsai1202/deep-memory --skill deep-memory -a claude-code -g
 > 加上 `-g` 會把技能裝進你的全域技能庫（例如 `~/.gemini/config/skills/` 或 `~/.claude/skills/`），這能讓你在所有專案中都能存取這些技能。
 > `--all` 會把技能裝進 CLI 認得的**每一個** Agent（Claude Code、Cursor、Codex 等）；如果只想裝進特定 Agent 的全域路徑，請用 `-a <agent-name> -g`。
 
-這只會放好技能檔案，下方的 Python 初始化步驟每個專案仍須執行一次。
+這只會放好技能檔案，下方的 Python 初始化步驟每台機器執行一次即可（venv 與所有資料都放在全域 `~/.deep-memory`，所有專案共用）。
 
 ### 初始化步驟
 
@@ -162,18 +162,18 @@ npx skills add kevintsai1202/deep-memory --skill deep-memory -a claude-code -g
    **Windows (PowerShell)**
 
    ```powershell
-   python -m venv .venv
-   .venv\Scripts\python -m pip install -r skills/chroma-hybrid-search/requirements.txt
-   .venv\Scripts\python skills/deep-memory/scripts/seed.py
-   .venv\Scripts\python skills/chroma-hybrid-search/scripts/update_db.py
+   python -m venv "$HOME\.deep-memory\.venv"
+   & "$HOME\.deep-memory\.venv\Scripts\python" -m pip install -r skills/chroma-hybrid-search/requirements.txt
+   & "$HOME\.deep-memory\.venv\Scripts\python" skills/deep-memory/scripts/seed.py
+   & "$HOME\.deep-memory\.venv\Scripts\python" skills/chroma-hybrid-search/scripts/update_db.py
    ```
    **Linux / macOS**
 
    ```bash
-   python3 -m venv .venv
-   .venv/bin/python -m pip install -r skills/chroma-hybrid-search/requirements.txt
-   .venv/bin/python skills/deep-memory/scripts/seed.py
-   .venv/bin/python skills/chroma-hybrid-search/scripts/update_db.py
+   python3 -m venv ~/.deep-memory/.venv
+   ~/.deep-memory/.venv/bin/python -m pip install -r skills/chroma-hybrid-search/requirements.txt
+   ~/.deep-memory/.venv/bin/python skills/deep-memory/scripts/seed.py
+   ~/.deep-memory/.venv/bin/python skills/chroma-hybrid-search/scripts/update_db.py
    ```
    `knowledge-base/` 由 `seed.py` 自動建立；`experience/` 與 `cold-notes/` 則在第一次真正寫入時自動建立，不需手動 `mkdir`。
 

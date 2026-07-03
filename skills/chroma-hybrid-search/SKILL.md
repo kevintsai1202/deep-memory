@@ -9,8 +9,10 @@ This skill provides local RAG retrieval by combining vector search (semantic) wi
 
 > **Cross-platform command convention** — in every command below, `<PY>` is the virtual-env Python:
 >
-> - **Windows (PowerShell):** `.venv\Scripts\python`
-> - **Linux / macOS:** `.venv/bin/python`
+> - **Windows (PowerShell):** `& "$HOME\.deep-memory\.venv\Scripts\python"`
+> - **Linux / macOS:** `~/.deep-memory/.venv/bin/python`
+>
+> The venv lives at a fixed absolute path inside the global workspace (`~/.deep-memory/.venv`), next to the data — commands work from any project directory; no project-local `.venv` is assumed. On PowerShell keep the `&` call operator and `$HOME` (PowerShell does not expand `~` in arguments to native commands); in Git Bash on Windows the same venv is `~/.deep-memory/.venv/Scripts/python`.
 >
 > > All `skills/...` paths assume the skill pack lives inside your current project (project-local install).
 >
@@ -24,12 +26,11 @@ This skill provides local RAG retrieval by combining vector search (semantic) wi
 When this skill is first invoked by the Agent or user, confirm that the `.venv` virtual environment and the `chroma_hybrid_db` vector database have been created and all required packages are installed. If not, execute the following steps:
 
 ```bash
-# 1. Create virtual environment (if it doesn't exist)
-python -m venv .venv
+# 1. Create virtual environment (if it doesn't exist) — fixed location in the global workspace, shared by all projects
+#    Windows (PowerShell): python -m venv "$HOME\.deep-memory\.venv"
+#    Linux / macOS:        python3 -m venv ~/.deep-memory/.venv
 
 # 2. Install required packages (no activation needed — call the venv Python directly)
-#    Windows:        .venv\Scripts\python -m pip install -r skills/chroma-hybrid-search/requirements.txt
-#    Linux / macOS:  .venv/bin/python   -m pip install -r skills/chroma-hybrid-search/requirements.txt
 <PY> -m pip install -r skills/chroma-hybrid-search/requirements.txt
 
 # 3. Initialize and build the local vector index database
@@ -37,7 +38,7 @@ python -m venv .venv
 ```
 
 > **Notes:**
-> 1. Do NOT commit `.venv` or `chroma_hybrid_db/` to GitHub — they must be compiled and generated locally using the steps above.
+> 1. Do NOT commit `.venv` or `chroma_hybrid_db/` to GitHub — both live under `~/.deep-memory` (outside any repo) and must be generated locally using the steps above.
 > 2. Whenever `knowledge-base/` or `experience/` Markdown content is updated, re-run Step 4 to rebuild the vector index.
 
 ---
@@ -49,8 +50,10 @@ The Agent can execute `scripts/search.py` directly from the terminal to perform 
 ### 1. Hybrid Search + Semantic Re-ranking (Default — Recommended)
 Best for complex questions requiring deep semantic understanding:
 ```bash
-<PY> skills/chroma-hybrid-search/scripts/search.py --query "spring animation tuning guidelines"
+<PY> skills/chroma-hybrid-search/scripts/search.py --query "spring animation tuning guidelines" --min-score 0.35
 ```
+
+Always pass `--min-score 0.35` in this mode — besides filtering noise, it lets the project-first pass fall back to the full cross-project store when the current project only has low-relevance hits (without it, a near-zero-score project hit still counts as "found something" and blocks the fallback).
 
 ### 2. Vector Similarity Search Only
 Best for cross-language or fuzzy semantic search:
@@ -94,4 +97,4 @@ The script outputs a standard JSON array. `path` for hot-store hits is `file.md#
 ## 🛡️ Anti-Hallucination RAG Routing Guide
 - **Filename-first matching**: If the user's question explicitly mentions a filename, read that file's full content directly via Python `glob` or fast text search first.
 - **Tiered RAG**: Prioritize filename matching; fall back to `search.py` hybrid search + rerank only if no match is found.
-- **Score threshold filtering**: Do not pass any chunks or files with a Rerank Score below `0.35` to the model — this prevents noise from degrading response quality.
+- **Score threshold filtering**: Do not pass any chunks or files with a Rerank Score below `0.35` to the model — this prevents noise from degrading response quality. Apply it search-side with `--min-score 0.35` rather than filtering the output afterwards: the search-side filter is also what allows the project-first pass to fall back to the cross-project store when project hits are all low-relevance.

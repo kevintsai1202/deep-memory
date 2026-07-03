@@ -13,8 +13,10 @@ This skill provides two core functions:
 
 > **Cross-platform command convention** — in every command below, `<PY>` is the virtual-env Python:
 >
-> - **Windows (PowerShell):** `.venv\Scripts\python`
-> - **Linux / macOS:** `.venv/bin/python`
+> - **Windows (PowerShell):** `& "$HOME\.deep-memory\.venv\Scripts\python"`
+> - **Linux / macOS:** `~/.deep-memory/.venv/bin/python`
+>
+> The venv lives at a fixed absolute path inside the global workspace (`~/.deep-memory/.venv`), next to the data — commands work from any project directory; no project-local `.venv` is assumed. On PowerShell keep the `&` call operator and `$HOME` (PowerShell does not expand `~` in arguments to native commands); in Git Bash on Windows the same venv is `~/.deep-memory/.venv/Scripts/python`.
 >
 > > All `skills/...` paths assume the skill pack lives inside your current project (project-local install).
 >

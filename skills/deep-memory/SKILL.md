@@ -7,8 +7,10 @@ description: "Use at the start of any task, whenever another skill is about to b
 
 > **Cross-platform command convention** — in every command below, `<PY>` is the virtual-env Python:
 >
-> - **Windows (PowerShell):** `.venv\Scripts\python`
-> - **Linux / macOS:** `.venv/bin/python`
+> - **Windows (PowerShell):** `& "$HOME\.deep-memory\.venv\Scripts\python"`
+> - **Linux / macOS:** `~/.deep-memory/.venv/bin/python`
+>
+> The venv lives at a fixed absolute path inside the global workspace (`~/.deep-memory/.venv`), next to the data — commands work from any project directory; no project-local `.venv` is assumed. On PowerShell keep the `&` call operator and `$HOME` (PowerShell does not expand `~` in arguments to native commands); in Git Bash on Windows the same venv is `~/.deep-memory/.venv/Scripts/python`.
 >
 > > All `skills/...` paths assume the skill pack lives inside your current project (project-local install).
 >
@@ -117,16 +119,16 @@ Execute the following only on the first turn of a conversation or when a topic s
 
 **RAG command:**
 ```bash
-<PY> skills/chroma-hybrid-search/scripts/search.py --query "core question of this turn" --limit 3
+<PY> skills/chroma-hybrid-search/scripts/search.py --query "core question of this turn" --limit 3 --min-score 0.35
 ```
 - **If this command fails** (no `.venv` yet, missing module, or any other error — most likely on a fresh install that hasn't run chroma-hybrid-search's bootstrap steps): don't retry and don't block the conversation on it. Treat it exactly like a below-threshold result — for the 0-category-hit case, proceed straight to Dynamic Classification; otherwise just continue without RAG context. Mention once, briefly, that semantic search isn't set up yet (point to chroma-hybrid-search's bootstrap section) — don't repeat that reminder every turn.
 - `search.py` covers both hot and cold store content — once the cold store is vectorized, don't also read `cold-notes/raw.jsonl` directly for retrieval; that's reserved for the refinement workflow in `resources/cold-store-and-vectorization.md`, which needs full-corpus access, not single-query retrieval
 - **Storage is a single global store under `~/.deep-memory`, not per-project.** All projects write to and read from the same home-directory cold/hot store, regardless of which project's directory the command runs from.
-- **Project scoping**: cold store entries carry a `project` field (auto-filled by `write_cold.py` from the calling directory's name). `search.py` uses this to search the current project first, and only falls back to the full cross-project store if that yields no results — this keeps unrelated projects' notes from crowding out relevant ones by default, while still finding cross-project knowledge (e.g. general git/deploy patterns) when nothing project-specific matches. Entries written before this scoping was added have no `project` field and are only reachable via the fallback pass.
+- **Project scoping**: cold store entries carry a `project` field (auto-filled by `write_cold.py` from the calling directory's name). `search.py` uses this to search the current project first, and only falls back to the full cross-project store if that yields no results — this keeps unrelated projects' notes from crowding out relevant ones by default, while still finding cross-project knowledge (e.g. general git/deploy patterns) when nothing project-specific matches. Entries written before this scoping was added have no `project` field and are only reachable via the fallback pass. Passing `--min-score 0.35` (as in the command above) is what keeps this fallback working: the fallback only fires when the project pass returns nothing, so without the search-side filter a single irrelevant project entry with a near-zero score would occupy the result set and block the cross-project search.
 - The returned JSON is now `{"scope": "...", "results": [...]}` — `scope` tells you whether the hit came from the current project or the cross-project fallback; read `results` for the actual entries.
 - `knowledge-base/*.md` and `experience/*.md` hits are indexed per `## 🔧` entry, so `path` looks like `file.md#entry-slug` — **use the returned `text` as-is; do not separately open `path` with the Read tool.** Re-reading the whole source file defeats the entry-level chunking and dumps every unrelated entry in that file back into context.
-- From `results`, use entries where `rerank_score > 0.35` — read their `text` as context
-- If all scores are `≤ 0.35`:
+- With `--min-score 0.35`, everything in `results` already passed the relevance threshold search-side — read each entry's `text` as context
+- If `results` is empty (nothing anywhere scored above 0.35):
   - If this run was triggered by the **0-category-hit** case, RAG also found nothing — proceed to the Dynamic Classification flow below.
   - Otherwise, notify the user: "No relevant records found in the knowledge base."
 
@@ -212,7 +214,7 @@ The `chroma-hybrid-search` sub-skill provides local semantic hybrid search and i
 
 ```bash
 # Standard hybrid search + Reranker (recommended default)
-<PY> skills/chroma-hybrid-search/scripts/search.py --query "your question" --limit 3
+<PY> skills/chroma-hybrid-search/scripts/search.py --query "your question" --limit 3 --min-score 0.35
 ```
 
 Vector index build/rebuild rules live in `resources/cold-store-and-vectorization.md` — read it when deciding whether `update_db.py` needs to run.
