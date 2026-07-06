@@ -347,24 +347,33 @@ function barChart(container, rows) {{
   }});
 }}
 
-// 關聯網絡圖：用內嵌座標畫 SVG，支援滾輪縮放與 hover 高亮鄰接
+// 關聯網絡圖：瀏覽器端即時力導向模擬，支援拖曳、hover 高亮、滾輪縮放
+// Python 的內嵌座標僅作為決定性起點，實際版面由下方物理模擬即時收斂。
 function networkGraph(container, g) {{
-  const nodes = g.nodes, edges = g.edges, pos = g.positions;
-  if (!nodes.length) {{ const e=document.createElement("div"); e.className="empty";
+  const W = 800, H = 600, CX = W / 2, CY = H / 2;   // 畫布與中心
+  const rawNodes = g.nodes, edges = g.edges, pos = g.positions;
+  if (!rawNodes.length) {{ const e=document.createElement("div"); e.className="empty";
     e.textContent=EMPTY_HINT; container.appendChild(e); return; }}
+
   const svg = document.createElementNS(SVGNS, "svg");
-  svg.setAttribute("viewBox", "0 0 800 600");
-  const root = document.createElementNS(SVGNS, "g");
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  const root = document.createElementNS(SVGNS, "g");   // 承載縮放/平移的群組
   svg.appendChild(root);
 
-  const idToEdges = {{}};   // 節點 id -> 鄰接節點 id 陣列
-  const lineEls = [];       // 邊元素 + 兩端 id，供 hover 高亮
+  // 建立可變動的模擬節點：x/y 起始於 Python 座標，vx/vy 為速度
+  const sim = {{}};        // id -> 模擬節點
+  const idToEdges = {{}};  // id -> 鄰接 id 陣列（供 hover）
+  rawNodes.forEach((n, i) => {{
+    const p = pos[n.id] || [CX + (i % 10) - 5, CY + Math.floor(i / 10) - 5];
+    const r = n.type === "category" ? 7 + Math.min(6, n.weight) : 3 + Math.min(4, n.weight);
+    sim[n.id] = {{n: n, x: p[0], y: p[1], vx: 0, vy: 0, r: r, fixed: false}};
+  }});
+
+  // 邊：建立線元素並記錄兩端，同時建鄰接表
+  const lineEls = [];
   edges.forEach(e => {{
-    const p1 = pos[e.source], p2 = pos[e.target];
-    if (!p1 || !p2) return;
+    if (!sim[e.source] || !sim[e.target]) return;
     const line = document.createElementNS(SVGNS, "line");
-    line.setAttribute("x1", p1[0]); line.setAttribute("y1", p1[1]);
-    line.setAttribute("x2", p2[0]); line.setAttribute("y2", p2[1]);
     line.setAttribute("class", "edge");
     root.appendChild(line);
     lineEls.push({{el: line, a: e.source, b: e.target}});
@@ -372,46 +381,143 @@ function networkGraph(container, g) {{
     (idToEdges[e.target] = idToEdges[e.target] || []).push(e.source);
   }});
 
-  const nodeEls = {{}};   // 節點 id -> circle 元素
-  nodes.forEach(n => {{
-    const p = pos[n.id]; if (!p) return;
+  // 節點：circle（分類藍、關鍵字綠）+ 分類標籤 text
+  const nodeEls = {{}};   // id -> circle 元素
+  const labelEls = [];    // {{el, id}} 分類標籤，跟隨節點移動
+  const order = Object.keys(sim);
+  order.forEach(id => {{
+    const s = sim[id], n = s.n;
     const circ = document.createElementNS(SVGNS, "circle");
-    circ.setAttribute("cx", p[0]); circ.setAttribute("cy", p[1]);
-    circ.setAttribute("r", n.type === "category" ? 7 + Math.min(6, n.weight) : 3 + Math.min(4, n.weight));
+    circ.setAttribute("r", s.r);
     circ.setAttribute("class", n.type === "category" ? "node-cat" : "node-kw");
+    circ.style.cursor = "grab";
     const title = document.createElementNS(SVGNS, "title");
     title.textContent = n.label + "（" + n.type + "，被引用 " + n.weight + "）";
     circ.appendChild(title);
     root.appendChild(circ);
-    nodeEls[n.id] = circ;
+    nodeEls[id] = circ;
     if (n.type === "category") {{
       const t = document.createElementNS(SVGNS, "text");
-      t.setAttribute("x", p[0] + 8); t.setAttribute("y", p[1] + 3);
       t.setAttribute("class", "node-label"); t.textContent = n.label;
       root.appendChild(t);
+      labelEls.push({{el: t, id: id}});
     }}
-    // hover：滑入時高亮自身與鄰接、淡化其餘
+    // hover：高亮自身與鄰接、淡化其餘
     circ.addEventListener("mouseenter", () => {{
-      const keep = new Set([n.id].concat(idToEdges[n.id] || []));
-      for (const id in nodeEls) nodeEls[id].style.opacity = keep.has(id) ? "1" : "0.15";
-      lineEls.forEach(le => le.el.style.opacity = (le.a === n.id || le.b === n.id) ? "1" : "0.05");
+      if (dragging) return;
+      const keep = new Set([id].concat(idToEdges[id] || []));
+      for (const k in nodeEls) nodeEls[k].style.opacity = keep.has(k) ? "1" : "0.15";
+      lineEls.forEach(le => le.el.style.opacity = (le.a === id || le.b === id) ? "1" : "0.05");
     }});
     circ.addEventListener("mouseleave", () => {{
-      for (const id in nodeEls) nodeEls[id].style.opacity = "1";
+      if (dragging) return;
+      for (const k in nodeEls) nodeEls[k].style.opacity = "1";
       lineEls.forEach(le => le.el.style.opacity = "1");
     }});
+    // 拖曳：pointerdown 抓住節點
+    circ.addEventListener("pointerdown", ev => {{
+      ev.preventDefault();
+      dragging = sim[id]; dragging.fixed = true;
+      circ.style.cursor = "grabbing";
+      circ.setPointerCapture(ev.pointerId);
+      alpha = Math.max(alpha, 0.5);   // 拖曳時重新加溫
+    }});
+    circ.addEventListener("pointermove", ev => {{
+      if (dragging !== sim[id]) return;
+      const loc = toLocal(ev);
+      dragging.x = loc.x; dragging.y = loc.y; dragging.vx = 0; dragging.vy = 0;
+    }});
+    const release = ev => {{
+      if (dragging === sim[id]) {{ dragging.fixed = false; dragging = null;
+        circ.style.cursor = "grab"; }}
+    }};
+    circ.addEventListener("pointerup", release);
+    circ.addEventListener("pointercancel", release);
   }});
 
-  // 滾輪縮放
+  // 把指標事件座標換算到 root 群組的座標系（自動處理縮放/平移）
+  function toLocal(ev) {{
+    const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+    return pt.matrixTransform(root.getScreenCTM().inverse());
+  }}
+
+  // 力導向參數
+  const REPULSION = 1400;  // 斥力強度
+  const SPRING = 0.02;     // 邊彈簧係數
+  const LINK_LEN = 55;     // 邊理想長度
+  const GRAVITY = 0.015;   // 向心重力（避免逃逸，取代硬夾限）
+  const DAMPING = 0.85;    // 速度阻尼
+  let alpha = 1.0;         // 冷卻係數，趨近 0 時停止
+  let dragging = null;
+
+  function tick() {{
+    // 斥力：所有節點兩兩相斥（庫倫式）
+    for (let i = 0; i < order.length; i++) {{
+      const a = sim[order[i]];
+      for (let j = i + 1; j < order.length; j++) {{
+        const b = sim[order[j]];
+        let dx = a.x - b.x, dy = a.y - b.y;
+        let d2 = dx * dx + dy * dy || 0.01;
+        const f = (REPULSION * alpha) / d2;
+        const d = Math.sqrt(d2);
+        const ux = dx / d, uy = dy / d;
+        a.vx += ux * f; a.vy += uy * f;
+        b.vx -= ux * f; b.vy -= uy * f;
+      }}
+    }}
+    // 邊彈簧：沿邊拉近至理想長度
+    lineEls.forEach(le => {{
+      const a = sim[le.a], b = sim[le.b];
+      let dx = b.x - a.x, dy = b.y - a.y;
+      let d = Math.hypot(dx, dy) || 0.01;
+      const f = SPRING * (d - LINK_LEN) * alpha;
+      const ux = dx / d, uy = dy / d;
+      a.vx += ux * f; a.vy += uy * f;
+      b.vx -= ux * f; b.vy -= uy * f;
+    }});
+    // 向心重力 + 積分位移（拖曳中的節點不受力）
+    order.forEach(id => {{
+      const s = sim[id];
+      if (s.fixed) return;
+      s.vx += (CX - s.x) * GRAVITY * alpha;
+      s.vy += (CY - s.y) * GRAVITY * alpha;
+      s.vx *= DAMPING; s.vy *= DAMPING;
+      s.x += s.vx; s.y += s.vy;
+    }});
+    draw();
+    alpha *= 0.985;                       // 逐步冷卻
+    if (alpha > 0.02 || dragging) requestAnimationFrame(tick);
+  }}
+
+  // 依模擬座標更新 SVG
+  function draw() {{
+    lineEls.forEach(le => {{
+      const a = sim[le.a], b = sim[le.b];
+      le.el.setAttribute("x1", a.x); le.el.setAttribute("y1", a.y);
+      le.el.setAttribute("x2", b.x); le.el.setAttribute("y2", b.y);
+    }});
+    for (const id in nodeEls) {{
+      nodeEls[id].setAttribute("cx", sim[id].x);
+      nodeEls[id].setAttribute("cy", sim[id].y);
+    }}
+    labelEls.forEach(l => {{
+      l.el.setAttribute("x", sim[l.id].x + sim[l.id].r + 2);
+      l.el.setAttribute("y", sim[l.id].y + 3);
+    }});
+  }}
+
+  // 滾輪縮放（以 root 群組整體縮放）
   let scale = 1;
   svg.addEventListener("wheel", ev => {{
     ev.preventDefault();
     scale *= ev.deltaY < 0 ? 1.1 : 0.9;
     scale = Math.min(5, Math.max(0.3, scale));
-    root.setAttribute("transform", `scale(${{scale}})`);
+    root.setAttribute("transform", "scale(" + scale + ")");
   }}, {{ passive: false }});
 
   container.appendChild(svg);
+  draw();
+  requestAnimationFrame(tick);   // 啟動即時模擬
 }}
 
 // 依序建立 6 面板
