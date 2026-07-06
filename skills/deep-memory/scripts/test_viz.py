@@ -73,6 +73,15 @@ class TestLoadData(unittest.TestCase):
         self.assertEqual(data["categories"], [])
         self.assertTrue(any("knowledge-base" in w for w in data["warnings"]))
 
+    def test_bad_encoding_degrades(self):
+        # raw.jsonl 為非 UTF-8 位元組時，應降級為警告而非崩潰
+        d = Path(tempfile.mkdtemp())
+        (d / "cold-notes").mkdir()
+        (d / "cold-notes" / "raw.jsonl").write_bytes(b"\xff\xfe\x00\x01bad bytes")
+        data = viz.load_data(d)
+        self.assertEqual(data["coldnotes"], [])
+        self.assertTrue(any("raw.jsonl" in w for w in data["warnings"]))
+
 class TestAggregate(unittest.TestCase):
     def setUp(self):
         # 準備三筆 cold notes 樣本，涵蓋跨日期、重複標籤、多專案與品質
@@ -189,6 +198,20 @@ class TestRender(unittest.TestCase):
         html = viz.render_html(data, stats, [], [], {}, top_tags=20)
         self.assertIn("id=\"dm-data\"", html)
         self.assertIn("尚無", html)
+
+    def test_escapes_angle_and_amp_in_data(self):
+        # 使用者記憶內容含 < 與 &，內嵌時須跳脫為 < / &，杜絕標籤突破
+        data = {"categories": [{"id": "x", "title": "a</script>&b", "file": "", "keywords": ["k"]}],
+                "experience": [], "coldnotes": [], "warnings": []}
+        stats = {"timeline": [], "tags": [], "projects": [], "quality": []}
+        nodes, edges = viz.build_graph(data["categories"], [], 12)
+        pos = viz.compute_layout(nodes, edges)
+        html = viz.render_html(data, stats, nodes, edges, pos)
+        self.assertIn("\\u003c", html)   # < 已跳脫
+        self.assertIn("\\u0026", html)   # & 已跳脫
+        # 內嵌資料區段不得出現未跳脫的 </script>（避免標籤提前關閉）
+        data_seg = html.split('id="dm-data">')[1].split("</script>")[0]
+        self.assertNotIn("</script", data_seg)
 
 class TestMain(unittest.TestCase):
     def test_end_to_end_writes_html(self):

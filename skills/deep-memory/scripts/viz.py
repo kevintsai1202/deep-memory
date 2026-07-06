@@ -58,7 +58,8 @@ def load_data(workspace):
         bad = 0
         try:
             raw_lines = cold_path.read_text(encoding="utf-8").splitlines()
-        except OSError as e:
+        except (OSError, ValueError) as e:
+            # ValueError 涵蓋 UnicodeDecodeError（非 UTF-8 位元組），與 _read_index 一致降級處理
             warnings.append(f"讀取失敗 {cold_path}：{e}")
             raw_lines = []
         for line in raw_lines:
@@ -175,6 +176,7 @@ def compute_layout(nodes, edges, seed=42, iterations=200, width=800, height=600)
         return {}
 
     rng = random.Random(seed)
+    # 節點順序即決定性來源：沿用 build_graph 的插入序，勿改用 set 等無序容器
     ids = [n["id"] for n in nodes]
     area = width * height
     k = math.sqrt(area / len(ids))  # 理想間距
@@ -334,7 +336,7 @@ function card(title, wide) {{
 function barChart(container, rows) {{
   if (!rows.length) {{ const e=document.createElement("div"); e.className="empty";
     e.textContent="無資料"; container.appendChild(e); return; }}
-  const max = Math.max.apply(null, rows.map(r => r[1]));
+  const max = Math.max.apply(null, [1].concat(rows.map(r => r[1])));
   rows.forEach(([label, val]) => {{
     const row = document.createElement("div"); row.className = "bar-row";
     const l = document.createElement("div"); l.className = "label"; l.textContent = label; l.title = label;
@@ -355,19 +357,22 @@ function networkGraph(container, g) {{
   const root = document.createElementNS(SVGNS, "g");
   svg.appendChild(root);
 
-  const idToEdges = {{}};
+  const idToEdges = {{}};   // 節點 id -> 鄰接節點 id 陣列
+  const lineEls = [];       // 邊元素 + 兩端 id，供 hover 高亮
   edges.forEach(e => {{
-    const line = document.createElementNS(SVGNS, "line");
     const p1 = pos[e.source], p2 = pos[e.target];
     if (!p1 || !p2) return;
+    const line = document.createElementNS(SVGNS, "line");
     line.setAttribute("x1", p1[0]); line.setAttribute("y1", p1[1]);
     line.setAttribute("x2", p2[0]); line.setAttribute("y2", p2[1]);
     line.setAttribute("class", "edge");
     root.appendChild(line);
+    lineEls.push({{el: line, a: e.source, b: e.target}});
     (idToEdges[e.source] = idToEdges[e.source] || []).push(e.target);
     (idToEdges[e.target] = idToEdges[e.target] || []).push(e.source);
   }});
 
+  const nodeEls = {{}};   // 節點 id -> circle 元素
   nodes.forEach(n => {{
     const p = pos[n.id]; if (!p) return;
     const circ = document.createElementNS(SVGNS, "circle");
@@ -378,21 +383,32 @@ function networkGraph(container, g) {{
     title.textContent = n.label + "（" + n.type + "，被引用 " + n.weight + "）";
     circ.appendChild(title);
     root.appendChild(circ);
+    nodeEls[n.id] = circ;
     if (n.type === "category") {{
       const t = document.createElementNS(SVGNS, "text");
       t.setAttribute("x", p[0] + 8); t.setAttribute("y", p[1] + 3);
       t.setAttribute("class", "node-label"); t.textContent = n.label;
       root.appendChild(t);
     }}
+    // hover：滑入時高亮自身與鄰接、淡化其餘
+    circ.addEventListener("mouseenter", () => {{
+      const keep = new Set([n.id].concat(idToEdges[n.id] || []));
+      for (const id in nodeEls) nodeEls[id].style.opacity = keep.has(id) ? "1" : "0.15";
+      lineEls.forEach(le => le.el.style.opacity = (le.a === n.id || le.b === n.id) ? "1" : "0.05");
+    }});
+    circ.addEventListener("mouseleave", () => {{
+      for (const id in nodeEls) nodeEls[id].style.opacity = "1";
+      lineEls.forEach(le => le.el.style.opacity = "1");
+    }});
   }});
 
   // 滾輪縮放
-  let scale = 1, tx = 0, ty = 0;
+  let scale = 1;
   svg.addEventListener("wheel", ev => {{
     ev.preventDefault();
     scale *= ev.deltaY < 0 ? 1.1 : 0.9;
     scale = Math.min(5, Math.max(0.3, scale));
-    root.setAttribute("transform", `translate(${{tx}},${{ty}}) scale(${{scale}})`);
+    root.setAttribute("transform", `scale(${{scale}})`);
   }}, {{ passive: false }});
 
   container.appendChild(svg);
