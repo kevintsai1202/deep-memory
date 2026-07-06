@@ -104,5 +104,37 @@ class TestAggregate(unittest.TestCase):
         self.assertEqual(s["timeline"], [])
         self.assertEqual(s["tags"], [])
 
+class TestGraph(unittest.TestCase):
+    def test_shared_keyword_connects_categories(self):
+        # 兩分類共享關鍵字（大小寫視為同一）應連到同一 keyword 節點
+        cats = [
+            {"id": "a", "title": "a", "file": "a.md", "keywords": ["API", "x"]},
+            {"id": "b", "title": "b", "file": "b.md", "keywords": ["api", "y"]},
+        ]
+        nodes, edges = viz.build_graph(cats, [], max_keywords=12)
+        ids = {n["id"] for n in nodes}
+        self.assertIn("cat:a", ids)
+        self.assertIn("cat:b", ids)
+        kw_nodes = [n for n in nodes if n["type"] == "keyword" and n["label"].lower() == "api"]
+        self.assertEqual(len(kw_nodes), 1)
+        shared_id = kw_nodes[0]["id"]
+        srcs = {(e["source"], e["target"]) for e in edges}
+        self.assertIn(("cat:a", shared_id), srcs)
+        self.assertIn(("cat:b", shared_id), srcs)
+
+    def test_max_keywords_cap(self):
+        # 每分類最多取 max_keywords 個關鍵字
+        cats = [{"id": "big", "title": "big", "file": "b.md",
+                 "keywords": [f"k{i}" for i in range(50)]}]
+        nodes, edges = viz.build_graph(cats, [], max_keywords=5)
+        kw = [n for n in nodes if n["type"] == "keyword"]
+        self.assertEqual(len(kw), 5)
+
+    def test_empty(self):
+        # 空輸入回傳空 nodes/edges
+        nodes, edges = viz.build_graph([], [], max_keywords=12)
+        self.assertEqual(nodes, [])
+        self.assertEqual(edges, [])
+
 if __name__ == "__main__":
     unittest.main()

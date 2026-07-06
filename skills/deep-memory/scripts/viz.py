@@ -113,3 +113,53 @@ def aggregate_stats(coldnotes):
         "projects": _desc(projects),
         "quality": _desc(quality),
     }
+
+
+def _norm_kw(keyword):
+    """關鍵字正規化：去頭尾空白、轉小寫，作為 keyword 節點的合併鍵。"""
+    return keyword.strip().lower()
+
+
+def build_graph(categories, experience, max_keywords=12):
+    """由分類與經驗建關聯圖。
+
+    節點：每個分類一個 category 節點；關鍵字合併為 keyword 節點（正規化後相同即同一節點）。
+    邊：分類 → 其關鍵字。每分類最多取前 max_keywords 個關鍵字以控制雜訊。
+    experience 併入視為 category 節點（type 仍為 category，來源不同不另分型別）。
+    """
+    nodes = {}   # id -> node dict
+    edges = []
+    kw_weight = Counter()  # 每個 keyword 節點被多少分類引用
+
+    def _add_source(items):
+        for c in items:
+            cid = "cat:" + c["id"]
+            nodes[cid] = {"id": cid, "label": c["title"] or c["id"],
+                          "type": "category", "weight": 0}
+            seen = set()  # 同分類內去重，避免重複邊
+            for raw in c.get("keywords", []):
+                key = _norm_kw(raw)
+                if not key or key in seen:
+                    continue
+                seen.add(key)
+                if len(seen) > max_keywords:
+                    break
+                kid = "kw:" + key
+                if kid not in nodes:
+                    nodes[kid] = {"id": kid, "label": raw.strip(),
+                                  "type": "keyword", "weight": 0}
+                kw_weight[kid] += 1
+                edges.append({"source": cid, "target": kid})
+
+    _add_source(categories)
+    _add_source(experience)
+
+    # keyword 節點權重＝被幾個分類引用；category 節點權重＝其出邊數
+    cat_deg = Counter(e["source"] for e in edges)
+    for nid, node in nodes.items():
+        if node["type"] == "keyword":
+            node["weight"] = kw_weight[nid]
+        else:
+            node["weight"] = cat_deg[nid]
+
+    return list(nodes.values()), edges
