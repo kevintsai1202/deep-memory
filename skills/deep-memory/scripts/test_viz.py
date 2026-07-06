@@ -163,5 +163,31 @@ class TestLayout(unittest.TestCase):
         # 空圖回傳空字典
         self.assertEqual(viz.compute_layout([], []), {})
 
+class TestRender(unittest.TestCase):
+    def test_contains_markers_and_no_external_urls(self):
+        # 產出應含基本標記，且不得載入任何外部資源
+        data = {"categories": [{"id": "a", "title": "a", "file": "", "keywords": ["k1"]}],
+                "experience": [], "coldnotes": [], "warnings": []}
+        stats = {"timeline": [["2026-07-06", 1]], "tags": [["k1", 1]],
+                 "projects": [["backend", 1]], "quality": [["raw", 1]]}
+        nodes, edges = viz.build_graph(data["categories"], [], 12)
+        pos = viz.compute_layout(nodes, edges)
+        html = viz.render_html(data, stats, nodes, edges, pos, top_tags=20)
+        self.assertIn("<!doctype html>", html.lower())
+        self.assertIn("記憶儀表板", html)
+        self.assertIn("<svg", html)
+        # 零外部相依：不得出現外部資源載入
+        self.assertNotIn("src=\"http", html)
+        self.assertNotIn("href=\"http", html)
+        self.assertNotIn("@import", html)
+
+    def test_embeds_data_json(self):
+        # 空資料時仍內嵌資料容器並顯示提示
+        data = {"categories": [], "experience": [], "coldnotes": [], "warnings": []}
+        stats = {"timeline": [], "tags": [], "projects": [], "quality": []}
+        html = viz.render_html(data, stats, [], [], {}, top_tags=20)
+        self.assertIn("id=\"dm-data\"", html)
+        self.assertIn("尚無", html)
+
 if __name__ == "__main__":
     unittest.main()

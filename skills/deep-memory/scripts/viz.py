@@ -223,3 +223,190 @@ def compute_layout(nodes, edges, seed=42, iterations=200, width=800, height=600)
 
     # 四捨五入到小數 2 位，縮小內嵌 JSON 並保證跨平台一致
     return {i: [round(pos[i][0], 2), round(pos[i][1], 2)] for i in ids}
+
+
+def _embed_json(obj):
+    """把物件序列化為可安全內嵌於 <script> 的 JSON 字串（跳脫 < 與 & 防止破壞標籤）。"""
+    return (json.dumps(obj, ensure_ascii=False)
+            .replace("<", "\\u003c").replace("&", "\\u0026"))
+
+
+def render_html(data, stats, nodes, edges, positions, top_tags=20):
+    """組出單檔、自帶資料、可離線的互動 HTML 儀表板字串。
+
+    所有 CSS/JS/資料內嵌，無任何外部 URL。空資料時顯示提示而非留白。
+    """
+    payload = {
+        "categories": data.get("categories", []),
+        "experience": data.get("experience", []),
+        "warnings": data.get("warnings", []),
+        "counts": {
+            "categories": len(data.get("categories", [])),
+            "experience": len(data.get("experience", [])),
+            "coldnotes": len(data.get("coldnotes", [])),
+        },
+        "stats": {
+            "timeline": stats.get("timeline", []),
+            "tags": stats.get("tags", [])[:top_tags],
+            "projects": stats.get("projects", []),
+            "quality": stats.get("quality", []),
+        },
+        "graph": {"nodes": nodes, "edges": edges, "positions": positions},
+    }
+    data_json = _embed_json(payload)
+    empty_hint = "尚無記憶資料，請先累積 cold notes 或知識庫後再產生。"
+
+    # 說明：CSS/JS 為靜態字串常量；JS 從 #dm-data 讀 payload 後渲染 6 面板。
+    return f"""<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>deep-memory 記憶儀表板</title>
+<style>
+:root {{ --bg:#f7f8fa; --card:#fff; --fg:#1c2024; --muted:#6b7280; --line:#e5e7eb;
+        --accent:#4f46e5; --cat:#4f46e5; --kw:#10b981; }}
+@media (prefers-color-scheme: dark) {{
+  :root {{ --bg:#0f1115; --card:#1a1d24; --fg:#e6e8eb; --muted:#9aa2ad; --line:#2a2f3a;
+           --accent:#818cf8; --cat:#818cf8; --kw:#34d399; }}
+}}
+* {{ box-sizing:border-box; }}
+body {{ margin:0; background:var(--bg); color:var(--fg);
+       font-family:system-ui,-apple-system,"Segoe UI","Microsoft JhengHei",sans-serif; }}
+header {{ padding:20px 24px; border-bottom:1px solid var(--line); }}
+h1 {{ font-size:20px; margin:0; }}
+.sub {{ color:var(--muted); font-size:13px; margin-top:4px; }}
+.grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+         gap:16px; padding:16px 24px; }}
+.card {{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }}
+.card h2 {{ font-size:14px; margin:0 0 12px; }}
+.card.wide {{ grid-column:1/-1; }}
+.bar-row {{ display:flex; align-items:center; gap:8px; margin:4px 0; font-size:12px; }}
+.bar-row .label {{ width:120px; text-align:right; color:var(--muted);
+                   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
+.bar-row .bar {{ height:14px; background:var(--accent); border-radius:4px; }}
+.bar-row .val {{ color:var(--muted); }}
+svg {{ width:100%; height:520px; display:block; touch-action:none; }}
+.node-cat {{ fill:var(--cat); }}
+.node-kw {{ fill:var(--kw); }}
+.edge {{ stroke:var(--line); stroke-width:1; }}
+.node-label {{ font-size:10px; fill:var(--fg); pointer-events:none; }}
+.empty {{ color:var(--muted); font-size:13px; padding:24px; text-align:center; }}
+.warn {{ color:#b45309; font-size:12px; padding:0 24px 8px; }}
+</style>
+</head>
+<body>
+<header>
+  <h1>🧠 deep-memory 記憶儀表板</h1>
+  <div class="sub" id="dm-summary"></div>
+</header>
+<div class="warn" id="dm-warn"></div>
+<div class="grid" id="dm-grid"></div>
+<svg style="display:none" aria-hidden="true"></svg>
+<script type="application/json" id="dm-data">{data_json}</script>
+<script>
+const EMPTY_HINT = {json.dumps(empty_hint, ensure_ascii=False)};
+const D = JSON.parse(document.getElementById("dm-data").textContent);
+
+// 摘要列
+document.getElementById("dm-summary").textContent =
+  `分類 ${{D.counts.categories}} · 經驗 ${{D.counts.experience}} · cold notes ${{D.counts.coldnotes}}`;
+
+// 警告
+if (D.warnings && D.warnings.length) {{
+  document.getElementById("dm-warn").textContent = "⚠ " + D.warnings.join("；");
+}}
+
+const grid = document.getElementById("dm-grid");
+const SVGNS = "http://www.w3.org/2000/svg";
+
+// 建卡片容器
+function card(title, wide) {{
+  const c = document.createElement("div");
+  c.className = "card" + (wide ? " wide" : "");
+  const h = document.createElement("h2");
+  h.textContent = title;
+  c.appendChild(h);
+  grid.appendChild(c);
+  return c;
+}}
+
+// 橫向長條圖（給標籤/專案等）
+function barChart(container, rows) {{
+  if (!rows.length) {{ const e=document.createElement("div"); e.className="empty";
+    e.textContent="無資料"; container.appendChild(e); return; }}
+  const max = Math.max.apply(null, rows.map(r => r[1]));
+  rows.forEach(([label, val]) => {{
+    const row = document.createElement("div"); row.className = "bar-row";
+    const l = document.createElement("div"); l.className = "label"; l.textContent = label; l.title = label;
+    const bar = document.createElement("div"); bar.className = "bar";
+    bar.style.width = Math.max(2, (val / max) * 180) + "px";
+    const v = document.createElement("div"); v.className = "val"; v.textContent = val;
+    row.append(l, bar, v); container.appendChild(row);
+  }});
+}}
+
+// 關聯網絡圖：用內嵌座標畫 SVG，支援滾輪縮放與 hover 高亮鄰接
+function networkGraph(container, g) {{
+  const nodes = g.nodes, edges = g.edges, pos = g.positions;
+  if (!nodes.length) {{ const e=document.createElement("div"); e.className="empty";
+    e.textContent=EMPTY_HINT; container.appendChild(e); return; }}
+  const svg = document.createElementNS(SVGNS, "svg");
+  svg.setAttribute("viewBox", "0 0 800 600");
+  const root = document.createElementNS(SVGNS, "g");
+  svg.appendChild(root);
+
+  const idToEdges = {{}};
+  edges.forEach(e => {{
+    const line = document.createElementNS(SVGNS, "line");
+    const p1 = pos[e.source], p2 = pos[e.target];
+    if (!p1 || !p2) return;
+    line.setAttribute("x1", p1[0]); line.setAttribute("y1", p1[1]);
+    line.setAttribute("x2", p2[0]); line.setAttribute("y2", p2[1]);
+    line.setAttribute("class", "edge");
+    root.appendChild(line);
+    (idToEdges[e.source] = idToEdges[e.source] || []).push(e.target);
+    (idToEdges[e.target] = idToEdges[e.target] || []).push(e.source);
+  }});
+
+  nodes.forEach(n => {{
+    const p = pos[n.id]; if (!p) return;
+    const circ = document.createElementNS(SVGNS, "circle");
+    circ.setAttribute("cx", p[0]); circ.setAttribute("cy", p[1]);
+    circ.setAttribute("r", n.type === "category" ? 7 + Math.min(6, n.weight) : 3 + Math.min(4, n.weight));
+    circ.setAttribute("class", n.type === "category" ? "node-cat" : "node-kw");
+    const title = document.createElementNS(SVGNS, "title");
+    title.textContent = n.label + "（" + n.type + "，被引用 " + n.weight + "）";
+    circ.appendChild(title);
+    root.appendChild(circ);
+    if (n.type === "category") {{
+      const t = document.createElementNS(SVGNS, "text");
+      t.setAttribute("x", p[0] + 8); t.setAttribute("y", p[1] + 3);
+      t.setAttribute("class", "node-label"); t.textContent = n.label;
+      root.appendChild(t);
+    }}
+  }});
+
+  // 滾輪縮放
+  let scale = 1, tx = 0, ty = 0;
+  svg.addEventListener("wheel", ev => {{
+    ev.preventDefault();
+    scale *= ev.deltaY < 0 ? 1.1 : 0.9;
+    scale = Math.min(5, Math.max(0.3, scale));
+    root.setAttribute("transform", `translate(${{tx}},${{ty}}) scale(${{scale}})`);
+  }}, {{ passive: false }});
+
+  container.appendChild(svg);
+}}
+
+// 依序建立 6 面板
+networkGraph(card("🕸️ 關鍵字 ↔ 分類 關聯網絡", true), D.graph);
+barChart(card("📊 各分類關鍵字數"), D.categories.map(c => [c.title || c.id, (c.keywords||[]).length])
+           .sort((a,b)=>b[1]-a[1]));
+barChart(card("📈 cold notes 時間趨勢"), D.stats.timeline);
+barChart(card("🏷️ 標籤熱度 Top"), D.stats.tags);
+barChart(card("📁 專案分布"), D.stats.projects);
+barChart(card("🔄 品質佔比（raw/reviewed）"), D.stats.quality);
+</script>
+</body>
+</html>"""
