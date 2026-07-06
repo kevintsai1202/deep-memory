@@ -302,7 +302,6 @@ svg {{ width:100%; height:520px; display:block; touch-action:none; }}
 </header>
 <div class="warn" id="dm-warn"></div>
 <div class="grid" id="dm-grid"></div>
-<svg style="display:none" aria-hidden="true"></svg>
 <script type="application/json" id="dm-data">{data_json}</script>
 <script>
 const EMPTY_HINT = {json.dumps(empty_hint, ensure_ascii=False)};

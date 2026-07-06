@@ -175,7 +175,8 @@ class TestRender(unittest.TestCase):
         html = viz.render_html(data, stats, nodes, edges, pos, top_tags=20)
         self.assertIn("<!doctype html>", html.lower())
         self.assertIn("記憶儀表板", html)
-        self.assertIn("<svg", html)
+        self.assertIn("createElementNS", html)   # 網絡圖由 JS 動態建立 SVG
+        self.assertIn("networkGraph", html)      # 6 面板之一的網絡圖渲染函式
         # 零外部相依：不得出現外部資源載入
         self.assertNotIn("src=\"http", html)
         self.assertNotIn("href=\"http", html)
