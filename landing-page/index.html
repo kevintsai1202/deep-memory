@@ -859,10 +859,31 @@
         </div>
       </div>
 
+      <!-- 記憶儀表板展示 (Dashboard Showcase) -->
+      <div id="dashboard" class="section section-border" style="max-width: 1100px; margin: 0 auto; padding: var(--section-padding) 32px; border-top: 1px solid var(--border-color);">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <div class="mono" style="color: var(--text-muted); font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 16px;">{{t.dashboard_badge}}</div>
+          <h2 style="font-size: 38px; font-weight: 700; letter-spacing: -0.02em; margin: 0;">{{t.dashboard_title}}</h2>
+          <p style="color: var(--text-secondary); font-size: 15.5px; margin: 12px auto 0; max-width: 760px; line-height: 1.7;">{{t.dashboard_desc}}</p>
+        </div>
+        <div style="border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; background: var(--bg-secondary); box-shadow: 0 8px 40px rgba(0,0,0,0.12);">
+          <img src="memory-dashboard-graph.png" alt="{{t.dashboard_alt}}" style="width: 100%; display: block;" loading="lazy" />
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px 20px; justify-content: center; margin-top: 24px; font-size: 13.5px; color: var(--text-secondary);">
+          <span>🕸️ {{t.dashboard_p1}}</span>
+          <span>🔗 {{t.dashboard_p2}}</span>
+          <span>🎛️ {{t.dashboard_p3}}</span>
+        </div>
+      </div>
+
       <!-- 更新紀錄 (Changelog) -->
       <div class="section" style="max-width: 760px; margin: 0 auto; padding: 0 32px 48px;">
         <div class="mono" style="color: var(--text-muted); font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 16px; text-align: center;">{{t.changelog_badge}}</div>
         <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; gap: 16px; font-size: 13.5px; line-height: 1.6;">
+            <span class="mono" style="color: var(--text-muted); flex-shrink: 0; width: 88px;">{{t.changelog_v3_date}}</span>
+            <span style="color: var(--text-secondary);">{{t.changelog_v3_desc}}</span>
+          </div>
           <div style="display: flex; gap: 16px; font-size: 13.5px; line-height: 1.6;">
             <span class="mono" style="color: var(--text-muted); flex-shrink: 0; width: 88px;">{{t.changelog_v2_date}}</span>
             <span style="color: var(--text-secondary);">{{t.changelog_v2_desc}}</span>
@@ -973,7 +994,17 @@ const T = {
     storage_card_hot_desc: "冷資料經過精煉後，轉化為結構化的 `.md` 知識庫與技能踩坑日誌，由本機向量檢索快速配對，直接注入 Agent 上下文。",
     storage_card_hot_status: "RAG 已就緒",
     
+    dashboard_badge: "Memory Dashboard",
+    dashboard_title: "把記憶畫成知識圖譜",
+    dashboard_desc: "一行指令，將你累積的知識、經驗與 cold notes 產成單檔、可離線開啟的互動儀表板。核心是一張三分知識圖譜（分類 ── 詞 ── 專案）：知識庫的 keyword 與 cold notes 的 tag 統一成共用的「詞」節點，讓同時是 keyword 又是 tag 的橋接詞，把「你記錄的知識」連到「你實際用到它的專案」。純 Python 標準函式庫，不需 venv、不需 pip、零外部相依。",
+    dashboard_alt: "Deep-Memory 記憶儀表板：分類 · 詞 · 專案 三分知識圖譜",
+    dashboard_p1: "即時力導向版面 · 節點可拖曳 · 平移縮放",
+    dashboard_p2: "知識／經驗／專案／keyword／tag／橋接詞 分色",
+    dashboard_p3: "搜尋 · 點擊聚焦鄰域 · 類型開關 · hover 顯示名稱",
+
     changelog_badge: "更新紀錄",
+    changelog_v3_date: "2026-07-06",
+    changelog_v3_desc: "新增記憶儀表板（`viz.py`）：把知識庫、經驗與 cold notes 產成單檔、自帶資料、可離線的互動 HTML。核心為三分知識圖譜（分類 ── 詞 ── 專案），keyword 與 tag 統一為共用「詞」節點，橋接詞連起知識與實際專案；知識／經驗／專案／keyword／tag／橋接皆分色，支援拖曳、平移、縮放、搜尋、點擊聚焦、類型開關。純標準函式庫，不需 venv／pip。",
     changelog_v2_date: "2026-07-03",
     changelog_v2_desc: "RAG 推論引擎改為 ONNX Runtime 直接推論（不再依賴 PyTorch）：索引更新 21 秒 → 1 秒、語意檢索 20 秒 → 7 秒、安裝體積 3 GB → 200 MB；檢索結果與 0.35 門檻完全不變，既有索引自動遷移免重建。另新增增量索引（只重算新增／變動條目）與精煉流程第 7 步（重建後抽查驗證）。",
     changelog_v1_date: "2026-07-02",
@@ -1059,7 +1090,17 @@ const T = {
     storage_card_hot_desc: "A curated folder of structured `.md` categories and skill pitfall logs, indexed by keywords for rapid, automatic injection.",
     storage_card_hot_status: "RAG Ready",
     
+    dashboard_badge: "Memory Dashboard",
+    dashboard_title: "See your memory as a knowledge graph",
+    dashboard_desc: "One command turns your accumulated knowledge, experience, and cold notes into a single-file, offline-openable interactive dashboard. Its centrepiece is a tripartite knowledge graph (category ── term ── project): knowledge-base keywords and cold-note tags are unified into shared term nodes, so a term that is both a keyword and a tag bridges the knowledge you documented to the projects you actually used it in. Pure Python standard library — no venv, no pip, zero external dependencies.",
+    dashboard_alt: "Deep-Memory dashboard: a category · term · project tripartite knowledge graph",
+    dashboard_p1: "Live force-directed layout · draggable nodes · pan & zoom",
+    dashboard_p2: "Colour-coded knowledge / experience / project / keyword / tag / bridge",
+    dashboard_p3: "Search · click-to-focus · type toggles · hover labels",
+
     changelog_badge: "Changelog",
+    changelog_v3_date: "2026-07-06",
+    changelog_v3_desc: "New Memory Dashboard (`viz.py`): turns the knowledge base, experience, and cold notes into a single-file, self-contained, offline HTML dashboard. Centrepiece is a tripartite knowledge graph (category ── term ── project) where keywords and tags unify into shared term nodes and bridge terms link knowledge to the projects it was used in; knowledge / experience / project / keyword / tag / bridge are colour-coded, with drag, pan, zoom, search, click-to-focus, and type toggles. Pure standard library — no venv/pip.",
     changelog_v2_date: "2026-07-03",
     changelog_v2_desc: "RAG inference now runs directly on ONNX Runtime (no PyTorch): index updates 21s -> 1s, semantic search 20s -> 7s, install footprint 3 GB -> 200 MB. Retrieval results and the 0.35 threshold are unchanged; existing indexes migrate automatically. Also adds incremental indexing (only new/changed entries are re-embedded) and refinement step 7 (post-rebuild search spot-check).",
     changelog_v1_date: "2026-07-02",
