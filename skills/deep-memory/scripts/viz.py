@@ -18,10 +18,14 @@ def _read_index(path):
         return [], f"缺少來源檔：{path}"
     try:
         obj = json.loads(path.read_text(encoding="utf-8"))
+        # 根節點必須是物件；否則視為格式錯，優雅降級
+        if not isinstance(obj, dict):
+            return [], f"格式非物件已略過 {path}"
         cats = obj.get("categories", [])
-        # 正規化每個 category，補齊缺漏欄位
         out = []
         for c in cats:
+            if not isinstance(c, dict):
+                continue  # 略過非物件的 category 項
             out.append({
                 "id": c.get("id", ""),
                 "title": c.get("title", c.get("id", "")),
@@ -52,7 +56,12 @@ def load_data(workspace):
         warnings.append(f"缺少來源檔：{cold_path}")
     else:
         bad = 0
-        for line in cold_path.read_text(encoding="utf-8").splitlines():
+        try:
+            raw_lines = cold_path.read_text(encoding="utf-8").splitlines()
+        except OSError as e:
+            warnings.append(f"讀取失敗 {cold_path}：{e}")
+            raw_lines = []
+        for line in raw_lines:
             line = line.strip()
             if not line:
                 continue
@@ -60,6 +69,9 @@ def load_data(workspace):
                 o = json.loads(line)
             except ValueError:
                 bad += 1
+                continue
+            if not isinstance(o, dict):
+                bad += 1  # 合法 JSON 但非物件，視為壞行
                 continue
             coldnotes.append({
                 "date": o.get("date", ""),

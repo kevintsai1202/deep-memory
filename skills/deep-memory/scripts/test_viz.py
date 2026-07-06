@@ -46,6 +46,7 @@ class TestLoadData(unittest.TestCase):
         self.assertTrue(len(data["warnings"]) >= 1)
 
     def test_bad_jsonl_line_skipped(self):
+        # 非 JSON 的行應被略過而非崩潰
         cold = ['{"date":"2026-07-05","tags":[],"project":"a","quality":"raw"}',
                 'THIS IS NOT JSON',
                 '{"date":"2026-07-06","tags":[],"project":"b","quality":"raw"}']
@@ -53,6 +54,24 @@ class TestLoadData(unittest.TestCase):
         data = viz.load_data(ws)
         self.assertEqual(len(data["coldnotes"]), 2)  # 壞行被略過
         self.assertTrue(any("raw.jsonl" in w for w in data["warnings"]))
+
+    def test_non_dict_jsonl_line_counted_bad(self):
+        # 合法 JSON 但非物件的行（如 42）應計為壞行而非崩潰
+        cold = ['{"date":"2026-07-05","tags":[],"project":"a","quality":"raw"}',
+                '42', '"foo"', '[1,2]']
+        ws = self._make_ws(cold_lines=cold)
+        data = viz.load_data(ws)
+        self.assertEqual(len(data["coldnotes"]), 1)
+        self.assertTrue(any("raw.jsonl" in w for w in data["warnings"]))
+
+    def test_non_dict_index_root_degrades(self):
+        # _index.json 根節點非物件（如陣列）應降級為空清單 + 警告，不崩潰
+        d = Path(tempfile.mkdtemp())
+        (d / "knowledge-base").mkdir()
+        (d / "knowledge-base" / "_index.json").write_text("[]", encoding="utf-8")
+        data = viz.load_data(d)
+        self.assertEqual(data["categories"], [])
+        self.assertTrue(any("knowledge-base" in w for w in data["warnings"]))
 
 if __name__ == "__main__":
     unittest.main()
