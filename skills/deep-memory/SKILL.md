@@ -217,7 +217,7 @@ python skills/deep-memory/scripts/viz.py --workspace <dir> --output <file.html> 
 
 The script prints the absolute path of the generated HTML on success. Tell the user to open that file in any browser (no server needed — CSS/JS/data are all inlined, zero external dependencies).
 
-**Panels**: keyword↔category network graph, per-category size, cold-notes timeline, tag heat Top-N, project distribution, quality (raw vs reviewed) ratio.
+**Panels**: a tripartite knowledge graph (category ── term ── project) where knowledge/experience categories, projects, and shared keyword/tag terms are colour-coded and bridge terms (both keyword and tag) are highlighted — with drag, pan, zoom, search, click-to-focus, hover labels, and type toggles — plus per-category size, cold-notes timeline, tag heat Top-N, project distribution, and quality (raw vs reviewed) ratio.
 
 This is on-demand only; it reads existing data and never modifies the memory store.
 

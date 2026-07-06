@@ -121,23 +121,38 @@ def _norm_kw(keyword):
     return keyword.strip().lower()
 
 
-def build_graph(categories, experience, max_keywords=12):
-    """由分類與經驗建關聯圖。
+def build_graph(categories, experience, coldnotes=None, max_keywords=12, min_tag_count=2):
+    """建三分圖：分類(category) ──keyword── 詞(term) ──tag── 專案(project)。
 
-    節點：每個分類一個 category 節點；關鍵字合併為 keyword 節點（正規化後相同即同一節點）。
-    邊：分類 → 其關鍵字。每分類最多取前 max_keywords 個關鍵字以控制雜訊。
-    experience 併入視為 category 節點（type 仍為 category，來源不同不另分型別）。
+    - 分類節點分兩種來源：knowledge（知識庫）與 experience（經驗），供渲染分色。
+    - 詞節點統一 keyword 與 tag：正規化後同字即同一節點；kind 標記其身分
+      （keyword=僅出現在知識庫、tag=僅出現在 cold notes、both=兩者皆是＝橋接詞）。
+    - 專案節點作為 tag 的錨點（tag 屬於 cold notes，每筆有 project）。
+    - 詞的納入規則：知識庫關鍵字（每分類取前 max_keywords 個）一律納入；
+      cold notes 的 tag 需出現次數 ≥ min_tag_count，或本身也是關鍵字（橋接詞）才納入，
+      以控制節點數量。
+    邊：分類→詞（keyword 關係）、專案→詞（tag 關係）。
     """
+    coldnotes = coldnotes or []
     nodes = {}   # id -> node dict
     edges = []
-    kw_weight = Counter()  # 每個 keyword 節點被多少分類引用
+    edge_seen = set()  # (source, target) 去重
 
-    def _add_source(items):
+    def _term_id(key):
+        return "term:" + key
+
+    # 先算出每分類「截斷後」的關鍵字清單，並收集關鍵字詞集合 KW
+    cat_keywords = []   # [(cid, [(key, raw), ...]), ...]
+    kw_set = set()      # 所有納入的關鍵字（正規化）
+    kw_label = {}       # key -> 代表性原字串
+
+    def _collect(items, source):
         for c in items:
-            cid = "cat:" + c["id"]
+            cid = "cat:" + source + ":" + c["id"]
             nodes[cid] = {"id": cid, "label": c["title"] or c["id"],
-                          "type": "category", "weight": 0}
-            seen = set()  # 同分類內去重，避免重複邊
+                          "type": "category", "source": source, "weight": 0}
+            seen = set()  # 同分類內去重
+            picked = []
             for raw in c.get("keywords", []):
                 key = _norm_kw(raw)
                 if not key or key in seen:
@@ -145,23 +160,72 @@ def build_graph(categories, experience, max_keywords=12):
                 seen.add(key)
                 if len(seen) > max_keywords:
                     break
-                kid = "kw:" + key
-                if kid not in nodes:
-                    nodes[kid] = {"id": kid, "label": raw.strip(),
-                                  "type": "keyword", "weight": 0}
-                kw_weight[kid] += 1
-                edges.append({"source": cid, "target": kid})
+                picked.append((key, raw.strip()))
+                kw_set.add(key)
+                kw_label.setdefault(key, raw.strip())
+            cat_keywords.append((cid, picked))
 
-    _add_source(categories)
-    _add_source(experience)
+    _collect(categories, "knowledge")
+    _collect(experience, "experience")
 
-    # keyword 節點權重＝被幾個分類引用；category 節點權重＝其出邊數
-    cat_deg = Counter(e["source"] for e in edges)
+    # 統計 cold notes 的 tag 次數（正規化）
+    tag_count = Counter()
+    tag_label = {}
+    for n in coldnotes:
+        for raw in n.get("tags", []):
+            if not isinstance(raw, str):
+                continue
+            key = _norm_kw(raw)
+            if not key:
+                continue
+            tag_count[key] += 1
+            tag_label.setdefault(key, raw.strip())
+
+    # 決定納入的 tag 詞：次數達門檻，或本身是關鍵字（橋接詞一律納入）
+    tag_inc = {t for t, c in tag_count.items() if c >= min_tag_count or t in kw_set}
+
+    # 建立詞節點（keyword 詞 ∪ 納入的 tag 詞），標記 kind
+    term_keys = kw_set | tag_inc
+    for key in term_keys:
+        is_kw = key in kw_set
+        is_tag = key in tag_count
+        kind = "both" if (is_kw and is_tag) else ("keyword" if is_kw else "tag")
+        nodes[_term_id(key)] = {"id": _term_id(key),
+                                "label": kw_label.get(key) or tag_label.get(key) or key,
+                                "type": "term", "kind": kind, "weight": 0}
+
+    def _add_edge(src, tgt):
+        pair = (src, tgt)
+        if pair in edge_seen:
+            return
+        edge_seen.add(pair)
+        edges.append({"source": src, "target": tgt})
+
+    # 分類→詞（keyword 邊）
+    for cid, picked in cat_keywords:
+        for key, _raw in picked:
+            _add_edge(cid, _term_id(key))
+
+    # 專案→詞（tag 邊）：僅連納入的 tag 詞
+    for n in coldnotes:
+        proj = n.get("project") or "(未標)"
+        pid = "proj:" + proj
+        tags = {_norm_kw(t) for t in n.get("tags", []) if isinstance(t, str) and t.strip()}
+        tags = {t for t in tags if t in tag_inc}
+        if not tags:
+            continue
+        if pid not in nodes:
+            nodes[pid] = {"id": pid, "label": proj, "type": "project", "weight": 0}
+        for t in tags:
+            _add_edge(pid, _term_id(t))
+
+    # 權重＝節點的連接邊數（degree）
+    deg = Counter()
+    for e in edges:
+        deg[e["source"]] += 1
+        deg[e["target"]] += 1
     for nid, node in nodes.items():
-        if node["type"] == "keyword":
-            node["weight"] = kw_weight[nid]
-        else:
-            node["weight"] = cat_deg[nid]
+        node["weight"] = deg[nid]
 
     return list(nodes.values()), edges
 
@@ -267,10 +331,17 @@ def render_html(data, stats, nodes, edges, positions, top_tags=20):
 <title>deep-memory 記憶儀表板</title>
 <style>
 :root {{ --bg:#f7f8fa; --card:#fff; --fg:#1c2024; --muted:#6b7280; --line:#e5e7eb;
-        --accent:#4f46e5; --cat:#4f46e5; --kw:#10b981; }}
+        --accent:#4f46e5;
+        --cat:#4f46e5;      /* 知識分類 藍 */
+        --exp:#db2777;      /* 經驗分類 洋紅 */
+        --proj:#f59e0b;     /* 專案 琥珀 */
+        --kw:#10b981;       /* 詞：僅 keyword 綠 */
+        --tag:#06b6d4;      /* 詞：僅 tag 青 */
+        --bridge:#a855f7;   /* 詞：橋接(keyword+tag) 紫 */ }}
 @media (prefers-color-scheme: dark) {{
   :root {{ --bg:#0f1115; --card:#1a1d24; --fg:#e6e8eb; --muted:#9aa2ad; --line:#2a2f3a;
-           --accent:#818cf8; --cat:#818cf8; --kw:#34d399; }}
+           --accent:#818cf8; --cat:#818cf8; --exp:#f472b6; --proj:#fbbf24;
+           --kw:#34d399; --tag:#22d3ee; --bridge:#c084fc; }}
 }}
 * {{ box-sizing:border-box; }}
 body {{ margin:0; background:var(--bg); color:var(--fg);
@@ -288,13 +359,33 @@ h1 {{ font-size:20px; margin:0; }}
                    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
 .bar-row .bar {{ height:14px; background:var(--accent); border-radius:4px; }}
 .bar-row .val {{ color:var(--muted); }}
-svg {{ width:100%; height:520px; display:block; touch-action:none; }}
+svg {{ width:100%; height:560px; display:block; touch-action:none; cursor:grab;
+       background:var(--bg); border-radius:8px; }}
 .node-cat {{ fill:var(--cat); }}
-.node-kw {{ fill:var(--kw); }}
+.node-exp {{ fill:var(--exp); }}
+.node-proj {{ fill:var(--proj); }}
+.node-term-keyword {{ fill:var(--kw); }}
+.node-term-tag {{ fill:var(--tag); }}
+.node-term-both {{ fill:var(--bridge); stroke:var(--bridge); stroke-width:2;
+                   stroke-opacity:0.4; }}
 .edge {{ stroke:var(--line); stroke-width:1; }}
 .node-label {{ font-size:10px; fill:var(--fg); pointer-events:none; }}
 .empty {{ color:var(--muted); font-size:13px; padding:24px; text-align:center; }}
 .warn {{ color:#b45309; font-size:12px; padding:0 24px 8px; }}
+/* 關聯圖控制列 */
+.g-controls {{ display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center;
+               margin-bottom:10px; font-size:12px; }}
+.g-controls input[type=search] {{ padding:5px 9px; border:1px solid var(--line);
+    border-radius:6px; background:var(--bg); color:var(--fg); min-width:160px; }}
+.g-controls button {{ padding:5px 10px; border:1px solid var(--line); border-radius:6px;
+    background:var(--bg); color:var(--fg); cursor:pointer; }}
+.g-controls button:hover {{ border-color:var(--accent); }}
+.legend {{ display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; }}
+.legend label {{ display:inline-flex; align-items:center; gap:5px; cursor:pointer;
+    user-select:none; color:var(--muted); }}
+.legend .dot {{ width:11px; height:11px; border-radius:50%; display:inline-block; }}
+.legend input {{ accent-color:var(--accent); }}
+.g-hint {{ color:var(--muted); font-size:11px; margin-top:6px; }}
 </style>
 </head>
 <body>
@@ -347,29 +438,71 @@ function barChart(container, rows) {{
   }});
 }}
 
-// 關聯網絡圖：瀏覽器端即時力導向模擬，支援拖曳、hover 高亮、滾輪縮放
-// Python 的內嵌座標僅作為決定性起點，實際版面由下方物理模擬即時收斂。
+// 三分圖分組定義：知識/經驗/專案/keyword/tag/橋接，供上色、圖例與開關共用
+const GROUPS = [
+  {{key: "knowledge",  label: "知識分類",     color: "var(--cat)",    cls: "node-cat"}},
+  {{key: "experience", label: "經驗分類",     color: "var(--exp)",    cls: "node-exp"}},
+  {{key: "project",    label: "專案",         color: "var(--proj)",   cls: "node-proj"}},
+  {{key: "keyword",    label: "keyword",     color: "var(--kw)",     cls: "node-term-keyword"}},
+  {{key: "tag",        label: "tag",         color: "var(--tag)",    cls: "node-term-tag"}},
+  {{key: "both",       label: "橋接(kw+tag)", color: "var(--bridge)", cls: "node-term-both"}},
+];
+// 節點 -> 分組 key
+function groupOf(n) {{
+  if (n.type === "category") return n.source === "experience" ? "experience" : "knowledge";
+  if (n.type === "project") return "project";
+  if (n.type === "term") return n.kind || "keyword";
+  return "keyword";
+}}
+
+// 關聯網絡圖：三分圖 + 即時力導向模擬。
+// 支援：節點拖曳、畫布平移、滾輪縮放、重置、hover/點擊聚焦鄰域、搜尋、類型開關。
+// Python 內嵌座標僅作決定性起點，實際版面由物理模擬即時收斂。
 function networkGraph(container, g) {{
-  const W = 800, H = 600, CX = W / 2, CY = H / 2;   // 畫布與中心
+  const W = 800, H = 600, CX = W / 2, CY = H / 2;
   const rawNodes = g.nodes, edges = g.edges, pos = g.positions;
   if (!rawNodes.length) {{ const e=document.createElement("div"); e.className="empty";
     e.textContent=EMPTY_HINT; container.appendChild(e); return; }}
 
+  // ---- 控制列：搜尋 + 重置 + 圖例(兼類型開關) ----
+  const groups = {{}};   // key -> 是否顯示
+  GROUPS.forEach(x => groups[x.key] = true);
+  let query = "";        // 搜尋字串（小寫）
+  let focusId = null;    // 點擊聚焦的節點
+
+  const ctrl = document.createElement("div"); ctrl.className = "g-controls";
+  const search = document.createElement("input");
+  search.type = "search"; search.placeholder = "搜尋節點…";
+  search.addEventListener("input", () => {{ query = search.value.trim().toLowerCase(); refresh(); }});
+  const resetBtn = document.createElement("button"); resetBtn.textContent = "重置視圖";
+  const legend = document.createElement("div"); legend.className = "legend";
+  GROUPS.forEach(gr => {{
+    const lab = document.createElement("label");
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = true;
+    cb.addEventListener("change", () => {{ groups[gr.key] = cb.checked; refresh(); }});
+    const dot = document.createElement("span"); dot.className = "dot"; dot.style.background = gr.color;
+    const txt = document.createElement("span"); txt.textContent = gr.label;
+    lab.append(cb, dot, txt); legend.appendChild(lab);
+  }});
+  ctrl.append(search, resetBtn, legend);
+  container.appendChild(ctrl);
+
   const svg = document.createElementNS(SVGNS, "svg");
   svg.setAttribute("viewBox", "0 0 " + W + " " + H);
-  const root = document.createElementNS(SVGNS, "g");   // 承載縮放/平移的群組
+  const root = document.createElementNS(SVGNS, "g");   // 承載縮放/平移
   svg.appendChild(root);
 
-  // 建立可變動的模擬節點：x/y 起始於 Python 座標，vx/vy 為速度
-  const sim = {{}};        // id -> 模擬節點
-  const idToEdges = {{}};  // id -> 鄰接 id 陣列（供 hover）
+  // 建立模擬節點：x/y 起始於 Python 座標
+  const sim = {{}}; const idToEdges = {{}};
   rawNodes.forEach((n, i) => {{
     const p = pos[n.id] || [CX + (i % 10) - 5, CY + Math.floor(i / 10) - 5];
-    const r = n.type === "category" ? 7 + Math.min(6, n.weight) : 3 + Math.min(4, n.weight);
-    sim[n.id] = {{n: n, x: p[0], y: p[1], vx: 0, vy: 0, r: r, fixed: false}};
+    const big = (n.type === "category" || n.type === "project");
+    const r = big ? 7 + Math.min(8, n.weight) : 3 + Math.min(5, n.weight / 2);
+    sim[n.id] = {{n: n, x: p[0], y: p[1], vx: 0, vy: 0, r: r, fixed: false,
+                 grp: groupOf(n), always: big}};
   }});
 
-  // 邊：建立線元素並記錄兩端，同時建鄰接表
+  // 邊 + 鄰接表
   const lineEls = [];
   edges.forEach(e => {{
     if (!sim[e.source] || !sim[e.target]) return;
@@ -381,115 +514,128 @@ function networkGraph(container, g) {{
     (idToEdges[e.target] = idToEdges[e.target] || []).push(e.source);
   }});
 
-  // 節點：circle（分類藍、關鍵字綠）+ 分類標籤 text
-  const nodeEls = {{}};   // id -> circle 元素
-  const labelEls = [];    // {{el, id}} 分類標籤，跟隨節點移動
+  // 節點 circle + 標籤（分類/專案常駐標籤；詞節點僅在聚焦/hover/搜尋時顯示）
+  const nodeEls = {{}}; const labelEls = [];
   const order = Object.keys(sim);
   order.forEach(id => {{
     const s = sim[id], n = s.n;
+    const gr = GROUPS.find(x => x.key === s.grp);
     const circ = document.createElementNS(SVGNS, "circle");
     circ.setAttribute("r", s.r);
-    circ.setAttribute("class", n.type === "category" ? "node-cat" : "node-kw");
+    circ.setAttribute("class", gr ? gr.cls : "node-term-keyword");
     circ.style.cursor = "grab";
     const title = document.createElementNS(SVGNS, "title");
-    title.textContent = n.label + "（" + n.type + "，被引用 " + n.weight + "）";
+    const kindTxt = n.type === "term" ? ("詞/" + (n.kind === "both" ? "橋接" : n.kind))
+                  : (n.type === "category" ? (n.source === "experience" ? "經驗" : "知識") : "專案");
+    title.textContent = n.label + "（" + kindTxt + "，連結 " + n.weight + "）";
     circ.appendChild(title);
     root.appendChild(circ);
     nodeEls[id] = circ;
-    if (n.type === "category") {{
-      const t = document.createElementNS(SVGNS, "text");
-      t.setAttribute("class", "node-label"); t.textContent = n.label;
-      root.appendChild(t);
-      labelEls.push({{el: t, id: id}});
-    }}
-    // hover：高亮自身與鄰接、淡化其餘
-    circ.addEventListener("mouseenter", () => {{
-      if (dragging) return;
-      const keep = new Set([id].concat(idToEdges[id] || []));
-      for (const k in nodeEls) nodeEls[k].style.opacity = keep.has(k) ? "1" : "0.15";
-      lineEls.forEach(le => le.el.style.opacity = (le.a === id || le.b === id) ? "1" : "0.05");
-    }});
-    circ.addEventListener("mouseleave", () => {{
-      if (dragging) return;
-      for (const k in nodeEls) nodeEls[k].style.opacity = "1";
-      lineEls.forEach(le => le.el.style.opacity = "1");
-    }});
-    // 拖曳：pointerdown 抓住節點
+
+    const t = document.createElementNS(SVGNS, "text");
+    t.setAttribute("class", "node-label"); t.textContent = n.label;
+    root.appendChild(t);
+    labelEls.push({{el: t, id: id}});
+
+    // hover：暫時聚焦鄰域（不覆蓋已點擊聚焦）
+    circ.addEventListener("mouseenter", () => {{ if (!dragging && !focusId) {{ hoverId = id; refresh(); }} }});
+    circ.addEventListener("mouseleave", () => {{ if (hoverId === id) {{ hoverId = null; refresh(); }} }});
+    // 點擊：切換聚焦鄰域
+    circ.addEventListener("click", ev => {{ ev.stopPropagation();
+      if (dragMoved) {{ dragMoved = false; return; }}   // 拖曳結束的 click 不切換聚焦
+      focusId = (focusId === id) ? null : id; hoverId = null; refresh(); }});
+    // 拖曳節點
     circ.addEventListener("pointerdown", ev => {{
-      ev.preventDefault();
-      dragging = sim[id]; dragging.fixed = true;
+      ev.preventDefault(); ev.stopPropagation();   // 阻止觸發畫布平移
+      dragging = sim[id]; dragging.fixed = true; dragMoved = false;
       circ.style.cursor = "grabbing";
-      circ.setPointerCapture(ev.pointerId);
-      alpha = Math.max(alpha, 0.5);   // 拖曳時重新加溫
+      try {{ circ.setPointerCapture(ev.pointerId); }} catch (e) {{}}
+      alpha = Math.max(alpha, 0.5); startSim();      // 冷卻後仍能重啟迴圈以反映拖曳
     }});
     circ.addEventListener("pointermove", ev => {{
       if (dragging !== sim[id]) return;
-      const loc = toLocal(ev);
-      dragging.x = loc.x; dragging.y = loc.y; dragging.vx = 0; dragging.vy = 0;
+      const loc = toLocal(ev); dragging.x = loc.x; dragging.y = loc.y;
+      dragging.vx = 0; dragging.vy = 0; dragMoved = true;
     }});
-    const release = ev => {{
-      if (dragging === sim[id]) {{ dragging.fixed = false; dragging = null;
-        circ.style.cursor = "grab"; }}
-    }};
+    const release = () => {{ if (dragging === sim[id]) {{ dragging.fixed = false;
+      dragging = null; circ.style.cursor = "grab"; }} }};
     circ.addEventListener("pointerup", release);
     circ.addEventListener("pointercancel", release);
   }});
 
-  // 把指標事件座標換算到 root 群組的座標系（自動處理縮放/平移）
   function toLocal(ev) {{
     const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
     return pt.matrixTransform(root.getScreenCTM().inverse());
   }}
 
-  // 力導向參數
-  const REPULSION = 1400;  // 斥力強度
-  const SPRING = 0.02;     // 邊彈簧係數
-  const LINK_LEN = 55;     // 邊理想長度
-  const GRAVITY = 0.015;   // 向心重力（避免逃逸，取代硬夾限）
-  const DAMPING = 0.85;    // 速度阻尼
-  let alpha = 1.0;         // 冷卻係數，趨近 0 時停止
-  let dragging = null;
+  // ---- 顯示狀態刷新：套用類型開關、搜尋、聚焦/hover 的強調 ----
+  let hoverId = null;
+  function emphasisSet() {{
+    // 回傳需強調的節點 id 集合；null 代表全部強調（無聚焦/搜尋）
+    if (focusId) return new Set([focusId].concat(idToEdges[focusId] || []));
+    if (query) {{ const s = new Set();
+      order.forEach(id => {{ if (sim[id].n.label.toLowerCase().includes(query)) s.add(id); }});
+      return s; }}
+    if (hoverId) return new Set([hoverId].concat(idToEdges[hoverId] || []));
+    return null;
+  }}
+  function refresh() {{
+    const emp = emphasisSet();
+    order.forEach(id => {{
+      const s = sim[id];
+      const gvis = groups[s.grp];                 // 類型開關
+      const circ = nodeEls[id], lab = labelEls.find(l => l.id === id).el;
+      circ.style.display = gvis ? "" : "none";
+      if (!gvis) {{ lab.style.display = "none"; return; }}
+      const on = !emp || emp.has(id);
+      circ.style.opacity = on ? "1" : "0.12";
+      // 標籤：常駐(分類/專案) 或 被強調的詞 才顯示
+      const showLab = on && (s.always || (emp && emp.has(id)));
+      lab.style.display = showLab ? "" : "none";
+      lab.style.opacity = on ? "1" : "0.12";
+    }});
+    lineEls.forEach(le => {{
+      const gvis = groups[sim[le.a].grp] && groups[sim[le.b].grp];
+      le.el.style.display = gvis ? "" : "none";
+      if (!gvis) return;
+      const on = !emp || (emp.has(le.a) && emp.has(le.b));
+      le.el.style.opacity = on ? "0.9" : "0.05";
+    }});
+  }}
 
+  // ---- 力導向模擬 ----
+  const REPULSION = 1400, SPRING = 0.02, LINK_LEN = 55, GRAVITY = 0.015, DAMPING = 0.85;
+  let alpha = 1.0, dragging = null, running = false, dragMoved = false;
+  // 啟動模擬迴圈（若已停止則重啟）；冷卻停止後再次拖曳可靠此重啟
+  function startSim() {{ if (!running) {{ running = true; requestAnimationFrame(tick); }} }}
   function tick() {{
-    // 斥力：所有節點兩兩相斥（庫倫式）
     for (let i = 0; i < order.length; i++) {{
       const a = sim[order[i]];
       for (let j = i + 1; j < order.length; j++) {{
         const b = sim[order[j]];
         let dx = a.x - b.x, dy = a.y - b.y;
         let d2 = dx * dx + dy * dy || 0.01;
-        const f = (REPULSION * alpha) / d2;
-        const d = Math.sqrt(d2);
+        const d = Math.sqrt(d2), f = (REPULSION * alpha) / d2;
         const ux = dx / d, uy = dy / d;
-        a.vx += ux * f; a.vy += uy * f;
-        b.vx -= ux * f; b.vy -= uy * f;
+        a.vx += ux * f; a.vy += uy * f; b.vx -= ux * f; b.vy -= uy * f;
       }}
     }}
-    // 邊彈簧：沿邊拉近至理想長度
     lineEls.forEach(le => {{
       const a = sim[le.a], b = sim[le.b];
       let dx = b.x - a.x, dy = b.y - a.y;
       let d = Math.hypot(dx, dy) || 0.01;
-      const f = SPRING * (d - LINK_LEN) * alpha;
-      const ux = dx / d, uy = dy / d;
-      a.vx += ux * f; a.vy += uy * f;
-      b.vx -= ux * f; b.vy -= uy * f;
+      const f = SPRING * (d - LINK_LEN) * alpha, ux = dx / d, uy = dy / d;
+      a.vx += ux * f; a.vy += uy * f; b.vx -= ux * f; b.vy -= uy * f;
     }});
-    // 向心重力 + 積分位移（拖曳中的節點不受力）
     order.forEach(id => {{
-      const s = sim[id];
-      if (s.fixed) return;
-      s.vx += (CX - s.x) * GRAVITY * alpha;
-      s.vy += (CY - s.y) * GRAVITY * alpha;
-      s.vx *= DAMPING; s.vy *= DAMPING;
-      s.x += s.vx; s.y += s.vy;
+      const s = sim[id]; if (s.fixed) return;
+      s.vx += (CX - s.x) * GRAVITY * alpha; s.vy += (CY - s.y) * GRAVITY * alpha;
+      s.vx *= DAMPING; s.vy *= DAMPING; s.x += s.vx; s.y += s.vy;
     }});
     draw();
-    alpha *= 0.985;                       // 逐步冷卻
-    if (alpha > 0.02 || dragging) requestAnimationFrame(tick);
+    alpha *= 0.985;
+    if (alpha > 0.02 || dragging) {{ requestAnimationFrame(tick); }} else {{ running = false; }}
   }}
-
-  // 依模擬座標更新 SVG
   function draw() {{
     lineEls.forEach(le => {{
       const a = sim[le.a], b = sim[le.b];
@@ -497,8 +643,7 @@ function networkGraph(container, g) {{
       le.el.setAttribute("x2", b.x); le.el.setAttribute("y2", b.y);
     }});
     for (const id in nodeEls) {{
-      nodeEls[id].setAttribute("cx", sim[id].x);
-      nodeEls[id].setAttribute("cy", sim[id].y);
+      nodeEls[id].setAttribute("cx", sim[id].x); nodeEls[id].setAttribute("cy", sim[id].y);
     }}
     labelEls.forEach(l => {{
       l.el.setAttribute("x", sim[l.id].x + sim[l.id].r + 2);
@@ -506,22 +651,52 @@ function networkGraph(container, g) {{
     }});
   }}
 
-  // 滾輪縮放（以 root 群組整體縮放）
-  let scale = 1;
+  // ---- 視圖變換：縮放 + 平移 ----
+  let scale = 1, tx = 0, ty = 0;
+  function applyView() {{ root.setAttribute("transform",
+    "translate(" + tx + "," + ty + ") scale(" + scale + ")"); }}
   svg.addEventListener("wheel", ev => {{
     ev.preventDefault();
-    scale *= ev.deltaY < 0 ? 1.1 : 0.9;
-    scale = Math.min(5, Math.max(0.3, scale));
-    root.setAttribute("transform", "scale(" + scale + ")");
+    scale = Math.min(5, Math.max(0.3, scale * (ev.deltaY < 0 ? 1.1 : 0.9)));
+    applyView();
   }}, {{ passive: false }});
+  // 畫布平移：在空白處按住拖曳
+  let panning = null;
+  svg.addEventListener("pointerdown", ev => {{
+    if (dragging) return;
+    panning = {{x: ev.clientX, y: ev.clientY, tx: tx, ty: ty}};
+    svg.style.cursor = "grabbing";
+  }});
+  svg.addEventListener("pointermove", ev => {{
+    if (!panning) return;
+    tx = panning.tx + (ev.clientX - panning.x);
+    ty = panning.ty + (ev.clientY - panning.y);
+    applyView();
+  }});
+  const endPan = () => {{ panning = null; svg.style.cursor = "grab"; }};
+  svg.addEventListener("pointerup", endPan);
+  svg.addEventListener("pointerleave", endPan);
+  // 點空白處清除聚焦
+  svg.addEventListener("click", () => {{ if (focusId) {{ focusId = null; refresh(); }} }});
+  resetBtn.addEventListener("click", () => {{
+    scale = 1; tx = 0; ty = 0; applyView();
+    focusId = null; query = ""; search.value = "";
+    GROUPS.forEach(x => groups[x.key] = true);
+    legend.querySelectorAll("input").forEach(cb => cb.checked = true);
+    alpha = Math.max(alpha, 0.6); refresh(); startSim();
+  }});
 
   container.appendChild(svg);
-  draw();
-  requestAnimationFrame(tick);   // 啟動即時模擬
+  const hint = document.createElement("div"); hint.className = "g-hint";
+  hint.textContent = "拖曳節點可固定位置 · 空白處拖曳平移 · 滾輪縮放 · 點節點聚焦鄰域 · hover 顯示名稱";
+  container.appendChild(hint);
+
+  draw(); refresh();
+  startSim();
 }}
 
-// 依序建立 6 面板
-networkGraph(card("🕸️ 關鍵字 ↔ 分類 關聯網絡", true), D.graph);
+// 依序建立面板
+networkGraph(card("🕸️ 知識 · 詞 · 專案 關聯網絡", true), D.graph);
 barChart(card("📊 各分類關鍵字數"), D.categories.map(c => [c.title || c.id, (c.keywords||[]).length])
            .sort((a,b)=>b[1]-a[1]));
 barChart(card("📈 cold notes 時間趨勢"), D.stats.timeline);
@@ -550,7 +725,8 @@ def main(argv=None):
 
     data = load_data(workspace)
     stats = aggregate_stats(data["coldnotes"])
-    nodes, edges = build_graph(data["categories"], data["experience"], args.max_keywords)
+    nodes, edges = build_graph(data["categories"], data["experience"],
+                               data["coldnotes"], args.max_keywords)
     positions = compute_layout(nodes, edges)
     html = render_html(data, stats, nodes, edges, positions, top_tags=args.top_tags)
 

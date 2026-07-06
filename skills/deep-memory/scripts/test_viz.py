@@ -115,29 +115,58 @@ class TestAggregate(unittest.TestCase):
 
 class TestGraph(unittest.TestCase):
     def test_shared_keyword_connects_categories(self):
-        # 兩分類共享關鍵字（大小寫視為同一）應連到同一 keyword 節點
+        # 兩分類共享關鍵字（大小寫視為同一）應連到同一 term 節點
         cats = [
             {"id": "a", "title": "a", "file": "a.md", "keywords": ["API", "x"]},
             {"id": "b", "title": "b", "file": "b.md", "keywords": ["api", "y"]},
         ]
         nodes, edges = viz.build_graph(cats, [], max_keywords=12)
         ids = {n["id"] for n in nodes}
-        self.assertIn("cat:a", ids)
-        self.assertIn("cat:b", ids)
-        kw_nodes = [n for n in nodes if n["type"] == "keyword" and n["label"].lower() == "api"]
-        self.assertEqual(len(kw_nodes), 1)
-        shared_id = kw_nodes[0]["id"]
+        self.assertIn("cat:knowledge:a", ids)
+        self.assertIn("cat:knowledge:b", ids)
+        term_nodes = [n for n in nodes if n["type"] == "term" and n["label"].lower() == "api"]
+        self.assertEqual(len(term_nodes), 1)
+        shared_id = term_nodes[0]["id"]
         srcs = {(e["source"], e["target"]) for e in edges}
-        self.assertIn(("cat:a", shared_id), srcs)
-        self.assertIn(("cat:b", shared_id), srcs)
+        self.assertIn(("cat:knowledge:a", shared_id), srcs)
+        self.assertIn(("cat:knowledge:b", shared_id), srcs)
 
     def test_max_keywords_cap(self):
-        # 每分類最多取 max_keywords 個關鍵字
+        # 每分類最多取 max_keywords 個關鍵字（term 節點）
         cats = [{"id": "big", "title": "big", "file": "b.md",
                  "keywords": [f"k{i}" for i in range(50)]}]
         nodes, edges = viz.build_graph(cats, [], max_keywords=5)
-        kw = [n for n in nodes if n["type"] == "keyword"]
-        self.assertEqual(len(kw), 5)
+        terms = [n for n in nodes if n["type"] == "term"]
+        self.assertEqual(len(terms), 5)
+
+    def test_experience_source_distinct(self):
+        # 知識與經驗分類以 source 區分，供渲染分色
+        cats = [{"id": "k", "title": "k", "file": "", "keywords": ["a"]}]
+        exp = [{"id": "e", "title": "e", "keywords": ["a"]}]
+        nodes, edges = viz.build_graph(cats, exp, max_keywords=12)
+        srcmap = {n["id"]: n.get("source") for n in nodes if n["type"] == "category"}
+        self.assertEqual(srcmap.get("cat:knowledge:k"), "knowledge")
+        self.assertEqual(srcmap.get("cat:experience:e"), "experience")
+
+    def test_tag_bridge_shared_node(self):
+        # 同字既是 keyword 又是 tag → 單一 term 節點 kind=both，同時連分類與專案
+        cats = [{"id": "c", "title": "c", "file": "", "keywords": ["auth"]}]
+        cold = [{"tags": ["auth"], "project": "p", "quality": "raw", "date": "2026-07-06"}]
+        nodes, edges = viz.build_graph(cats, [], cold, max_keywords=12, min_tag_count=1)
+        term = [n for n in nodes if n["type"] == "term" and n["label"].lower() == "auth"]
+        self.assertEqual(len(term), 1)
+        self.assertEqual(term[0]["kind"], "both")
+        tid = term[0]["id"]
+        srcs = {(e["source"], e["target"]) for e in edges}
+        self.assertIn(("cat:knowledge:c", tid), srcs)   # 分類→詞
+        self.assertIn(("proj:p", tid), srcs)            # 專案→詞
+
+    def test_tag_below_threshold_excluded(self):
+        # 非關鍵字、且次數未達門檻的 tag 不納入，橋接詞除外
+        cold = [{"tags": ["rare"], "project": "p", "quality": "raw", "date": "d"}]
+        nodes, edges = viz.build_graph([], [], cold, max_keywords=12, min_tag_count=2)
+        labels = {n["label"].lower() for n in nodes if n["type"] == "term"}
+        self.assertNotIn("rare", labels)
 
     def test_empty(self):
         # 空輸入回傳空 nodes/edges
@@ -179,7 +208,7 @@ class TestRender(unittest.TestCase):
                 "experience": [], "coldnotes": [], "warnings": []}
         stats = {"timeline": [["2026-07-06", 1]], "tags": [["k1", 1]],
                  "projects": [["backend", 1]], "quality": [["raw", 1]]}
-        nodes, edges = viz.build_graph(data["categories"], [], 12)
+        nodes, edges = viz.build_graph(data["categories"], [], max_keywords=12)
         pos = viz.compute_layout(nodes, edges)
         html = viz.render_html(data, stats, nodes, edges, pos, top_tags=20)
         self.assertIn("<!doctype html>", html.lower())
@@ -204,7 +233,7 @@ class TestRender(unittest.TestCase):
         data = {"categories": [{"id": "x", "title": "a</script>&b", "file": "", "keywords": ["k"]}],
                 "experience": [], "coldnotes": [], "warnings": []}
         stats = {"timeline": [], "tags": [], "projects": [], "quality": []}
-        nodes, edges = viz.build_graph(data["categories"], [], 12)
+        nodes, edges = viz.build_graph(data["categories"], [], max_keywords=12)
         pos = viz.compute_layout(nodes, edges)
         html = viz.render_html(data, stats, nodes, edges, pos)
         self.assertIn("\\u003c", html)   # < 已跳脫
