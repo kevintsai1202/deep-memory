@@ -199,6 +199,30 @@ By default, files are stored relative to the resolved workspace root (global `~/
 
 ---
 
+## Memory Dashboard (Visualization)
+
+Generate a single-file, self-contained, offline-openable **interactive HTML dashboard** of the user's memory (knowledge-base / cold-notes / experience).
+
+**Trigger phrases**: 「產生記憶儀表板」「畫記憶圖表」「視覺化我的記憶」「memory dashboard」.
+
+**Command** (pure stdlib — needs only plain `python`/`python3`, NOT the `<PY>` venv):
+
+```bash
+# Default: reads ~/.deep-memory, writes ~/.deep-memory/memory-dashboard.html
+python skills/deep-memory/scripts/viz.py
+
+# Options
+python skills/deep-memory/scripts/viz.py --workspace <dir> --output <file.html> --top-tags 30 --max-keywords 12
+```
+
+The script prints the absolute path of the generated HTML on success. Tell the user to open that file in any browser (no server needed — CSS/JS/data are all inlined, zero external dependencies).
+
+**Panels**: keyword↔category network graph, per-category size, cold-notes timeline, tag heat Top-N, project distribution, quality (raw vs reviewed) ratio.
+
+This is on-demand only; it reads existing data and never modifies the memory store.
+
+---
+
 ## Dynamic Classification (knowledge-base only)
 
 Only after **both** keyword matching (Path 1) and RAG (Path 2) find nothing relevant to the current question:
