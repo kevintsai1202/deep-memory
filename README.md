@@ -178,6 +178,13 @@ This only places the skill files — you still need to run the Python initializa
 
 ## Changelog
 
+### 2026-07-06
+
+- New **Memory Dashboard** (`skills/deep-memory/scripts/viz.py`): a single-file, self-contained, offline-openable interactive HTML dashboard of your memory. Pure Python standard library — no venv, no pip. Run `python skills/deep-memory/scripts/viz.py` (or just say "產生記憶儀表板" / "memory dashboard") and open the printed HTML path in any browser.
+- The centrepiece is a **tripartite knowledge graph** (category ── term ── project). Knowledge-base keywords and cold-note tags are unified into shared *term* nodes, so a term that is both a keyword and a tag bridges the knowledge you documented to the projects you actually used it in. Knowledge vs. experience categories, projects, and keyword / tag / bridge terms are all colour-coded, rendered with a live force-directed layout and draggable nodes, canvas pan, wheel zoom, reset, search, click-to-focus, hover labels, and per-type show/hide toggles. Five stat panels accompany it: per-category size, cold-notes timeline, tag heat Top-N, project distribution, and quality (raw vs. reviewed) ratio.
+
+![Deep-Memory knowledge graph dashboard](assets/memory-dashboard-graph.png)
+
 ### 2026-07-02
 
 - Cold-store entries now auto-tag a `project` field (derived from the calling directory's name); `search.py` searches the current project first and only falls back to the full store when nothing project-specific matches. `search.py`'s output shape changed from a bare array to `{"scope": "...", "results": [...]}`.

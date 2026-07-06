@@ -183,6 +183,13 @@ npx skills add kevintsai1202/deep-memory --skill deep-memory -a claude-code -g
 
 ## Changelog
 
+### 2026-07-06
+
+- 新增**記憶儀表板**（`skills/deep-memory/scripts/viz.py`）：把你的記憶產成一份單檔、自帶資料、可離線開啟的互動 HTML 儀表板。純 Python 標準函式庫——不需 venv、不需 pip。執行 `python skills/deep-memory/scripts/viz.py`（或直接說「產生記憶儀表板」／「memory dashboard」），再用瀏覽器打開腳本印出的路徑即可。
+- 核心是一張**三分知識圖譜**（分類 ── 詞 ── 專案）。知識庫的 keyword 與 cold notes 的 tag 統一成共用的「詞」節點，因此同時是 keyword 又是 tag 的詞，會把「你記錄下來的知識」與「你實際用到它的專案」橋接起來。知識分類 vs. 經驗分類、專案、以及 keyword／tag／橋接詞皆以顏色區分，採即時力導向版面並支援節點拖曳、畫布平移、滾輪縮放、重置、搜尋、點擊聚焦鄰域、hover 顯示名稱、依類型開關顯示。另附五張統計面板：各分類規模、cold notes 時間趨勢、標籤熱度 Top-N、專案分布、品質（raw vs. reviewed）佔比。
+
+![Deep-Memory 知識圖譜儀表板](assets/memory-dashboard-graph.png)
+
 ### 2026-07-02
 
 - 冷庫條目新增 `project` 欄位（取自觸發指令當下的目錄名稱自動標記）；`search.py` 會先比對當前專案，找不到符合結果才退回全庫搜尋。`search.py` 的回傳格式也從純陣列改成 `{"scope": "...", "results": [...]}`。
