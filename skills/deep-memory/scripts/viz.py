@@ -87,3 +87,29 @@ def load_data(workspace):
 
     return {"categories": categories, "experience": experience,
             "coldnotes": coldnotes, "warnings": warnings}
+
+
+def aggregate_stats(coldnotes):
+    """彙總 cold notes：時間趨勢(升冪)、標籤/專案/品質次數(降冪)。空值欄位以 '(未標)' 計。"""
+    timeline = Counter()
+    tags = Counter()
+    projects = Counter()
+    quality = Counter()
+    for n in coldnotes:
+        if n.get("date"):
+            timeline[n["date"]] += 1
+        for t in n.get("tags", []):
+            tags[t] += 1
+        projects[n.get("project") or "(未標)"] += 1
+        quality[n.get("quality") or "(未標)"] += 1
+
+    def _desc(counter):
+        # 依次數降冪、同次數再依鍵名升冪，確保決定性
+        return [[k, v] for k, v in sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+    return {
+        "timeline": [[k, timeline[k]] for k in sorted(timeline)],
+        "tags": _desc(tags),
+        "projects": _desc(projects),
+        "quality": _desc(quality),
+    }

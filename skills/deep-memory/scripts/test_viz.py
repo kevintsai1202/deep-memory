@@ -73,5 +73,36 @@ class TestLoadData(unittest.TestCase):
         self.assertEqual(data["categories"], [])
         self.assertTrue(any("knowledge-base" in w for w in data["warnings"]))
 
+class TestAggregate(unittest.TestCase):
+    def setUp(self):
+        # 準備三筆 cold notes 樣本，涵蓋跨日期、重複標籤、多專案與品質
+        self.cold = [
+            {"date": "2026-07-05", "tags": ["auth", "ldap"], "project": "backend", "quality": "reviewed"},
+            {"date": "2026-07-05", "tags": ["auth"], "project": "backend", "quality": "raw"},
+            {"date": "2026-07-06", "tags": ["ui"], "project": "frontend", "quality": "raw"},
+        ]
+
+    def test_timeline_sorted_asc(self):
+        # 時間軸應依日期升冪，並正確計數
+        s = viz.aggregate_stats(self.cold)
+        self.assertEqual(s["timeline"], [["2026-07-05", 2], ["2026-07-06", 1]])
+
+    def test_tags_sorted_desc(self):
+        # 標籤依次數降冪，auth 出現 2 次應居首
+        s = viz.aggregate_stats(self.cold)
+        self.assertEqual(s["tags"][0], ["auth", 2])
+
+    def test_projects_and_quality(self):
+        # 專案與品質次數彙總正確
+        s = viz.aggregate_stats(self.cold)
+        self.assertEqual(dict(s["projects"]).get("backend"), 2)
+        self.assertEqual(dict(s["quality"]).get("raw"), 2)
+
+    def test_empty(self):
+        # 空輸入回傳全空清單，不崩潰
+        s = viz.aggregate_stats([])
+        self.assertEqual(s["timeline"], [])
+        self.assertEqual(s["tags"], [])
+
 if __name__ == "__main__":
     unittest.main()
