@@ -190,5 +190,33 @@ class TestRender(unittest.TestCase):
         self.assertIn("id=\"dm-data\"", html)
         self.assertIn("尚無", html)
 
+class TestMain(unittest.TestCase):
+    def test_end_to_end_writes_html(self):
+        # 端到端：給定 kb + cold notes，main 應寫出非空 HTML 並回傳 0
+        import json as _json
+        d = Path(tempfile.mkdtemp())
+        (d / "knowledge-base").mkdir()
+        (d / "knowledge-base" / "_index.json").write_text(_json.dumps(
+            {"categories": [{"id": "a", "title": "a", "file": "a.md", "keywords": ["k1", "k2"]}]},
+            ensure_ascii=False), encoding="utf-8")
+        (d / "cold-notes").mkdir()
+        (d / "cold-notes" / "raw.jsonl").write_text(_json.dumps(
+            {"date": "2026-07-06", "tags": ["k1"], "project": "p", "quality": "raw"},
+            ensure_ascii=False), encoding="utf-8")
+        out = d / "dash.html"
+        rc = viz.main(["--workspace", str(d), "--output", str(out)])
+        self.assertEqual(rc, 0)
+        self.assertTrue(out.exists())
+        self.assertGreater(out.stat().st_size, 0)
+        self.assertIn("記憶儀表板", out.read_text(encoding="utf-8"))
+
+    def test_empty_workspace_still_writes(self):
+        # 空 workspace（三來源檔全缺）仍應產出 HTML 且回傳 0，不崩潰
+        d = Path(tempfile.mkdtemp())
+        out = d / "dash.html"
+        rc = viz.main(["--workspace", str(d), "--output", str(out)])
+        self.assertEqual(rc, 0)
+        self.assertTrue(out.exists())
+
 if __name__ == "__main__":
     unittest.main()

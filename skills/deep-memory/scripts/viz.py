@@ -409,3 +409,39 @@ barChart(card("🔄 品質佔比（raw/reviewed）"), D.stats.quality);
 </script>
 </body>
 </html>"""
+
+
+def main(argv=None):
+    """命令列進入點：讀取記憶資料、算圖與版面、產出單檔 HTML 儀表板。"""
+    parser = argparse.ArgumentParser(description="產生 deep-memory 記憶儀表板（單檔 HTML）")
+    parser.add_argument("--workspace", default=str(Path.home() / ".deep-memory"),
+                        help="記憶資料根目錄（預設 ~/.deep-memory）")
+    parser.add_argument("--output", default=None,
+                        help="輸出 HTML 路徑（預設 <workspace>/memory-dashboard.html）")
+    parser.add_argument("--top-tags", type=int, default=20, help="標籤熱度顯示前幾名")
+    parser.add_argument("--max-keywords", type=int, default=12,
+                        help="關聯圖每分類最多納入的關鍵字數")
+    args = parser.parse_args(argv)
+
+    workspace = Path(args.workspace)
+    output = Path(args.output) if args.output else workspace / "memory-dashboard.html"
+
+    data = load_data(workspace)
+    stats = aggregate_stats(data["coldnotes"])
+    nodes, edges = build_graph(data["categories"], data["experience"], args.max_keywords)
+    positions = compute_layout(nodes, edges)
+    html = render_html(data, stats, nodes, edges, positions, top_tags=args.top_tags)
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(html, encoding="utf-8")
+
+    # 警告輸出到 stderr，不干擾正常路徑輸出
+    import sys
+    for w in data["warnings"]:
+        print("⚠ " + w, file=sys.stderr)
+    print(str(output.resolve()))  # 印出產出檔絕對路徑，方便直接開啟
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
