@@ -136,5 +136,32 @@ class TestGraph(unittest.TestCase):
         self.assertEqual(nodes, [])
         self.assertEqual(edges, [])
 
+class TestLayout(unittest.TestCase):
+    def _graph(self):
+        # 建一個小圖：兩分類共享 k2
+        cats = [{"id": "a", "title": "a", "file": "", "keywords": ["k1", "k2"]},
+                {"id": "b", "title": "b", "file": "", "keywords": ["k2", "k3"]}]
+        return viz.build_graph(cats, [], max_keywords=12)
+
+    def test_deterministic(self):
+        # 固定種子 → 兩次計算座標完全一致
+        nodes, edges = self._graph()
+        p1 = viz.compute_layout(nodes, edges)
+        p2 = viz.compute_layout(nodes, edges)
+        self.assertEqual(p1, p2)
+
+    def test_all_nodes_placed_in_bounds(self):
+        # 每個節點都有座標且落在畫布範圍內
+        nodes, edges = self._graph()
+        pos = viz.compute_layout(nodes, edges, width=800, height=600)
+        self.assertEqual(set(pos.keys()), {n["id"] for n in nodes})
+        for x, y in pos.values():
+            self.assertTrue(0 <= x <= 800)
+            self.assertTrue(0 <= y <= 600)
+
+    def test_empty(self):
+        # 空圖回傳空字典
+        self.assertEqual(viz.compute_layout([], []), {})
+
 if __name__ == "__main__":
     unittest.main()

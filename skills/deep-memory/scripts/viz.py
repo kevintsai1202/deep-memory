@@ -163,3 +163,63 @@ def build_graph(categories, experience, max_keywords=12):
             node["weight"] = cat_deg[nid]
 
     return list(nodes.values()), edges
+
+
+def compute_layout(nodes, edges, seed=42, iterations=200, width=800, height=600):
+    """以簡化 Fruchterman–Reingold 力導向算出各節點座標，回傳 {id:[x,y]}。
+
+    使用固定亂數種子確保決定性；斥力使節點分散、引力沿邊拉近，逐步降溫後
+    夾限於畫布範圍內。節點少時仍穩定。
+    """
+    if not nodes:
+        return {}
+
+    rng = random.Random(seed)
+    ids = [n["id"] for n in nodes]
+    area = width * height
+    k = math.sqrt(area / len(ids))  # 理想間距
+    # 初始位置：以種子亂數散佈於畫布中央區域
+    pos = {i: [rng.uniform(width * 0.25, width * 0.75),
+               rng.uniform(height * 0.25, height * 0.75)] for i in ids}
+
+    adj = [(e["source"], e["target"]) for e in edges]
+    temperature = width / 10.0
+    cooling = temperature / (iterations + 1)
+
+    for _ in range(iterations):
+        disp = {i: [0.0, 0.0] for i in ids}
+        # 斥力：所有節點兩兩相斥
+        for a in range(len(ids)):
+            for b in range(a + 1, len(ids)):
+                ia, ib = ids[a], ids[b]
+                dx = pos[ia][0] - pos[ib][0]
+                dy = pos[ia][1] - pos[ib][1]
+                dist = math.hypot(dx, dy) or 0.01
+                force = (k * k) / dist
+                ux, uy = dx / dist, dy / dist
+                disp[ia][0] += ux * force
+                disp[ia][1] += uy * force
+                disp[ib][0] -= ux * force
+                disp[ib][1] -= uy * force
+        # 引力：有邊者相吸
+        for s, t in adj:
+            dx = pos[s][0] - pos[t][0]
+            dy = pos[s][1] - pos[t][1]
+            dist = math.hypot(dx, dy) or 0.01
+            force = (dist * dist) / k
+            ux, uy = dx / dist, dy / dist
+            disp[s][0] -= ux * force
+            disp[s][1] -= uy * force
+            disp[t][0] += ux * force
+            disp[t][1] += uy * force
+        # 位移套用（受溫度上限）並夾限於畫布
+        for i in ids:
+            dx, dy = disp[i]
+            d = math.hypot(dx, dy) or 0.01
+            step = min(d, temperature)
+            pos[i][0] = min(width, max(0.0, pos[i][0] + dx / d * step))
+            pos[i][1] = min(height, max(0.0, pos[i][1] + dy / d * step))
+        temperature -= cooling
+
+    # 四捨五入到小數 2 位，縮小內嵌 JSON 並保證跨平台一致
+    return {i: [round(pos[i][0], 2), round(pos[i][1], 2)] for i in ids}
