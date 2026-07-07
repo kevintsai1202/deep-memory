@@ -13,6 +13,7 @@ import json
 _ENTRY_HEADING = re.compile(r"(?=^## 🔧 )", re.MULTILINE)
 _ENTRY_TITLE = re.compile(r"## 🔧\s*(.+)")
 _KEYWORDS_LINE = re.compile(r"\*\*keywords[:：]\*\*\s*(.+)", re.IGNORECASE)
+_SKILL_LINE = re.compile(r"\*\*(?:Skill|技能)[:：]\*\*\s*(.+)", re.IGNORECASE)
 _SKILL_FROM_FILENAME = re.compile(r"skill-(.+)\.md$")
 
 
@@ -48,6 +49,14 @@ def extract_tags(entry_text):
     if not m:
         return []
     return [t.strip() for t in m.group(1).split(",") if t.strip()]
+
+
+def extract_skill(entry_text):
+    """從 experience 條目文字擷取精確 skill ID，支援檔名不能表示的字元如冒號。"""
+    m = _SKILL_LINE.search(entry_text)
+    if not m:
+        return None
+    return m.group(1).strip() or None
 
 
 def read_knowledge_base(base_dir):
@@ -89,6 +98,7 @@ def read_knowledge_base(base_dir):
             used_slugs[slug] = count
             if count > 1:
                 slug = f"{slug}-{count}"
+            entry_skill = extract_skill(entry_text) or skill
 
             doc = {
                 "path": f"{rel_path}#{slug}",
@@ -96,8 +106,8 @@ def read_knowledge_base(base_dir):
                 "source": "hot",
                 "memory_type": memory_type
             }
-            if skill:
-                doc["skill"] = skill
+            if entry_skill:
+                doc["skill"] = entry_skill
             tags = extract_tags(entry_text)
             if tags:
                 doc["tags"] = tags

@@ -248,6 +248,35 @@ The migration is idempotent. It preserves invalid JSONL lines as-is, only update
 
 ---
 
+## Experience Refinement
+
+**Trigger phrases**: 「幫我精煉經驗」「幫我修正經驗庫」「把 cold notes 經驗升到熱庫」「refine experience」「promote cold experience」.
+
+This is part of deep-memory itself, not a separate skill. It promotes `memory_type=experience` / `both` cold notes into `experience/skill-[skill-id].md`, updates `experience/_index.json`, and can mark promoted cold notes as `reviewed`.
+
+```bash
+# Preview only; no files are changed
+python skills/deep-memory/scripts/refine_experience.py --dry-run
+
+# Apply all pending experience notes
+python skills/deep-memory/scripts/refine_experience.py --apply
+
+# Limit to a specific skill
+python skills/deep-memory/scripts/refine_experience.py --skill agent-browser-cli --apply
+
+# Rebuild searchable index and spot-check
+<PY> skills/chroma-hybrid-search/scripts/update_db.py
+<PY> skills/chroma-hybrid-search/scripts/search.py --query "keywords from promoted experience" --memory-type experience --limit 3 --min-score 0.35
+```
+
+Rules:
+- Always run the dry-run first when the user asks for refinement broadly.
+- `--apply` writes deterministic `## 🔧` entries. It does not invent new conclusions; it preserves the cold note content as traceable lessons and cites `cold-notes/raw.jsonl#L...`.
+- After `--apply`, run `update_db.py` and one `search.py --memory-type experience` spot-check before reporting success.
+- If the user only asks whether refinement is needed, do not apply; report the dry-run plan.
+
+---
+
 ## Dynamic Classification (knowledge-base only)
 
 Only after **both** keyword matching (Path 1) and RAG (Path 2) find nothing relevant to the current question:

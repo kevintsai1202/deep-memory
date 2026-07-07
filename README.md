@@ -179,6 +179,10 @@ This only places the skill files — you still need to run the Python initializa
 
 ## Changelog
 
+### 2026-07-08
+
+- Added `skills/deep-memory/scripts/refine_experience.py` to promote `memory_type=experience` / `both` cold notes into `experience/skill-[skill-id].md`. This closes the earlier "experience looks empty" gap: cold notes can now be classified, filtered, promoted into the cross-skill experience hot store, marked reviewed, re-indexed, and verified with `search.py --memory-type experience`.
+
 ### 2026-07-07
 
 - Cold-store entries now carry `memory_type` (`knowledge`, `experience`, or `both`) so refinement can route general knowledge to `knowledge-base/` and skill/tool lessons to `experience/skill-[skill-id].md` instead of mixing everything into one bucket. `write_cold.py` accepts `--memory-type`, `search.py` can filter with `--memory-type`, and the dashboard shows a memory-type distribution panel.

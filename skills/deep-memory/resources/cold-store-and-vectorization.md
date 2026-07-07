@@ -94,6 +94,7 @@ If the cold store has entries written since the last `update_db.py` run, a RAG q
 | `cold-notes/raw.jsonl` has ≥ **20 entries** | Enough raw material has accumulated for meaningful distillation |
 | A single `tags` or `skill` value appears ≥ **3 times** | High-frequency topic indicates a generalizable pattern worth promoting to the hot store |
 | User explicitly says "refine the cold store" | Explicit refinement command |
+| User explicitly says "refine experience" / 「精煉經驗」 / 「修正經驗庫」 | Route `memory_type=experience` notes into the cross-skill experience store |
 
 ### Refinement Workflow
 
@@ -127,6 +128,24 @@ If the cold store has entries written since the last `update_db.py` run, a RAG q
    The new entry must appear in the results. If it doesn't, the index did not pick it up —
    check that the entry uses the `## 🔧` heading format, then re-run the rebuild. Do not
    report the refinement as done until the spot-check passes.
+
+### Experience Refinement Shortcut
+
+For skill/tool lessons, use the deterministic promotion script instead of hand-editing every `experience/skill-*.md` file:
+
+```bash
+# Preview pending experience entries
+python skills/deep-memory/scripts/refine_experience.py --dry-run
+
+# Promote pending entries and mark source cold notes reviewed
+python skills/deep-memory/scripts/refine_experience.py --apply
+
+# Refresh search metadata/vectors and verify
+<PY> skills/chroma-hybrid-search/scripts/update_db.py
+<PY> skills/chroma-hybrid-search/scripts/search.py --query "promoted experience keywords" --memory-type experience --limit 3 --min-score 0.35
+```
+
+The script reads `memory_type=experience` and `memory_type=both`, groups by `skill`, writes traceable `## 🔧` entries into `experience/skill-[skill-id].md`, updates `experience/_index.json`, and cites the original `cold-notes/raw.jsonl#L...` source. Run `--dry-run` first for broad refinements; use `--skill <id>` when correcting one skill's experience store.
 
 ---
 

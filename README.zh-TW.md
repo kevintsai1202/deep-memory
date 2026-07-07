@@ -184,6 +184,10 @@ npx skills add kevintsai1202/deep-memory --skill deep-memory -a claude-code -g
 
 ## Changelog
 
+### 2026-07-08
+
+- 新增 `skills/deep-memory/scripts/refine_experience.py`，可把 `memory_type=experience` / `both` 的 cold notes 提升到 `experience/skill-[skill-id].md`。這補上先前「經驗看起來不足」的落差：cold notes 現在可以先分類、篩選，再提升到跨技能經驗熱庫、標記 reviewed、重建索引，並用 `search.py --memory-type experience` 驗證。
+
 ### 2026-07-07
 
 - 冷庫條目新增 `memory_type`（`knowledge` / `experience` / `both`），精煉時可把通用知識分流到 `knowledge-base/`，把技能/工具踩坑經驗分流到 `experience/skill-[skill-id].md`，避免全部混成同一類。`write_cold.py` 支援 `--memory-type`，`search.py` 支援 `--memory-type` 篩選，記憶儀表板也新增記憶類型佔比面板。
