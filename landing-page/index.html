@@ -393,7 +393,7 @@
 
         <!-- 快速安裝指令 -->
         <div style="display: flex; justify-content: center; margin-bottom: 64px;">
-          <div onclick="navigator.clipboard.writeText('npx skills add kevintsai1202/deep-memory --all -g'); alert('Copied / 已複製: npx skills add kevintsai1202/deep-memory --all -g');" class="mono" style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.15); padding: 10px 18px; border-radius: 8px; font-size: 13.5px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s;" title="點擊複製安裝指令" onmouseover="this.style.background='rgba(16, 185, 129, 0.1)'; this.style.borderColor='rgba(16, 185, 129, 0.3)';" onmouseout="this.style.background='rgba(16, 185, 129, 0.05)'; this.style.borderColor='rgba(16, 185, 129, 0.15)';">
+          <div onclick="{{copyInstall}}" class="mono" style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.15); padding: 10px 18px; border-radius: 8px; font-size: 13.5px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s;" title="點擊複製安裝指令" onmouseover="this.style.background='rgba(16, 185, 129, 0.1)'; this.style.borderColor='rgba(16, 185, 129, 0.3)';" onmouseout="this.style.background='rgba(16, 185, 129, 0.05)'; this.style.borderColor='rgba(16, 185, 129, 0.15)';">
             <span style="color: var(--brand-color); font-weight: 600;">$</span> <span style="color: var(--text-primary);">npx</span> skills add kevintsai1202/deep-memory --all -g
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left: 8px; opacity: 0.7;">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -1150,6 +1150,33 @@ class Component extends DCLogic {
     localStorage.setItem('lang', newLang);
   }
 
+  // 複製安裝指令：安全情境走 Clipboard API，否則退回 execCommand，皆失敗則跳出手動複製
+  copyInstall() {
+    const cmd = 'npx skills add kevintsai1202/deep-memory --all -g';
+    const t = T[this.state.lang];
+    // 只有真正寫入成功才提示，避免舊版「無論成敗都說已複製」的假訊息
+    const ok = () => alert((t && t.copy_ok ? t.copy_ok : 'Copied / 已複製') + ': ' + cmd);
+    const manual = () => window.prompt((t && t.copy_manual ? t.copy_manual : 'Copy manually / 請手動複製') + ':', cmd);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cmd).then(ok).catch(manual);
+      return;
+    }
+    // 非安全情境（例如以 file:// 開啟）沒有 Clipboard API，改用暫存 textarea + execCommand
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = cmd;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const done = document.execCommand('copy');
+      document.body.removeChild(ta);
+      done ? ok() : manual();
+    } catch (_) {
+      manual();
+    }
+  }
+
   renderVals() {
     const t = T[this.state.lang];
     return {
@@ -1158,6 +1185,7 @@ class Component extends DCLogic {
       theme: this.state.theme,
       toggleTheme: () => this.toggleTheme(),
       toggleLang: () => this.toggleLang(),
+      copyInstall: () => this.copyInstall(),
       highlights: [
         { icon: '🔁', title: this.state.lang === 'zh' ? '自動精煉與沉澱' : 'Genuinely Gets Stronger', desc: this.state.lang === 'zh' ? '每回合自動分析對話關鍵字與主題。當偵測到您正在使用特定工具或遇到已知問題時，主動載入過去踩坑紀錄與最佳實踐參數，防止重複開發。' : 'Checks a keyword index every turn — if it recognizes a problem it has solved before, it recalls the best solution or pitfall guide directly.' },
         { icon: '🧩', title: this.state.lang === 'zh' ? '跨技能經驗共享' : 'Cross-Skill Memory', desc: this.state.lang === 'zh' ? '當觸發 any 輔助技能時，Deep-Memory 會強制檢索該技能的歷史操作經驗，對常見的 API 版本衝突、參數失效及認證過期發出主動警告。' : 'Whenever another skill is invoked, Deep-Memory checks its skill experience store and proactively warns about past pitfalls.' },
