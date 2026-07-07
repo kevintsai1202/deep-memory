@@ -881,6 +881,10 @@
         <div class="mono" style="color: var(--text-muted); font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 16px; text-align: center;">{{t.changelog_badge}}</div>
         <div style="display: flex; flex-direction: column; gap: 12px;">
           <div style="display: flex; gap: 16px; font-size: 13.5px; line-height: 1.6;">
+            <span class="mono" style="color: var(--text-muted); flex-shrink: 0; width: 88px;">{{t.changelog_v4_date}}</span>
+            <span style="color: var(--text-secondary);">{{t.changelog_v4_desc}}</span>
+          </div>
+          <div style="display: flex; gap: 16px; font-size: 13.5px; line-height: 1.6;">
             <span class="mono" style="color: var(--text-muted); flex-shrink: 0; width: 88px;">{{t.changelog_v3_date}}</span>
             <span style="color: var(--text-secondary);">{{t.changelog_v3_desc}}</span>
           </div>
@@ -1003,6 +1007,8 @@ const T = {
     dashboard_p3: "搜尋 · 點擊聚焦鄰域 · 類型開關 · hover 顯示名稱",
 
     changelog_badge: "更新紀錄",
+    changelog_v4_date: "2026-07-07",
+    changelog_v4_desc: "冷庫條目新增 `memory_type`（knowledge / experience / both）：寫入時可先標記通用知識、技能經驗或兩者皆有，精煉時再分流到 `knowledge-base/` 或 `experience/skill-[skill-id].md`。`write_cold.py` 支援 `--memory-type`，`search.py` 支援同欄位篩選，並新增遷移腳本替既有 cold notes 回填類型後重建索引。",
     changelog_v3_date: "2026-07-06",
     changelog_v3_desc: "新增記憶儀表板（`viz.py`）：把知識庫、經驗與 cold notes 產成單檔、自帶資料、可離線的互動 HTML。核心為三分知識圖譜（分類 ── 詞 ── 專案），keyword 與 tag 統一為共用「詞」節點，橋接詞連起知識與實際專案；知識／經驗／專案／keyword／tag／橋接皆分色，支援拖曳、平移、縮放、搜尋、點擊聚焦、類型開關。純標準函式庫，不需 venv／pip。",
     changelog_v2_date: "2026-07-03",
@@ -1099,6 +1105,8 @@ const T = {
     dashboard_p3: "Search · click-to-focus · type toggles · hover labels",
 
     changelog_badge: "Changelog",
+    changelog_v4_date: "2026-07-07",
+    changelog_v4_desc: "Cold-store entries now carry `memory_type` (knowledge / experience / both): agents can mark general knowledge, skill experience, or a record that should be split during refinement. Refinement routes them to `knowledge-base/` or `experience/skill-[skill-id].md`; `write_cold.py` accepts `--memory-type`, `search.py` can filter by it, and a migration script backfills existing cold notes before rebuilding the index.",
     changelog_v3_date: "2026-07-06",
     changelog_v3_desc: "New Memory Dashboard (`viz.py`): turns the knowledge base, experience, and cold notes into a single-file, self-contained, offline HTML dashboard. Centrepiece is a tripartite knowledge graph (category ── term ── project) where keywords and tags unify into shared term nodes and bridge terms link knowledge to the projects it was used in; knowledge / experience / project / keyword / tag / bridge are colour-coded, with drag, pan, zoom, search, click-to-focus, and type toggles. Pure standard library — no venv/pip.",
     changelog_v2_date: "2026-07-03",
