@@ -107,6 +107,7 @@ All scripts default `--workspace` to `~/.deep-memory` — one store for every pr
 ├── cold-notes/
 │   └── raw.jsonl                # Cold store: instant write, refined into the hot store once it accumulates.
 │                                 # Each entry auto-tags a `project` field (from the calling directory's name)
+│                                 # and a `memory_type` field (knowledge / experience / both)
 │                                 # so search.py can look at the current project before falling back to everything.
 ├── chroma_hybrid_db/            # Locally-built ChromaDB binaries (indexes both hot and cold stores)
 └── backup/                      # memory-backup's staging area (its own git repo, pushed to GitHub)
@@ -177,6 +178,11 @@ This only places the skill files — you still need to run the Python initializa
 ---
 
 ## Changelog
+
+### 2026-07-07
+
+- Cold-store entries now carry `memory_type` (`knowledge`, `experience`, or `both`) so refinement can route general knowledge to `knowledge-base/` and skill/tool lessons to `experience/skill-[skill-id].md` instead of mixing everything into one bucket. `write_cold.py` accepts `--memory-type`, `search.py` can filter with `--memory-type`, and the dashboard shows a memory-type distribution panel.
+- Added `skills/deep-memory/scripts/migrate_memory_type.py` to backfill `memory_type` into existing `cold-notes/raw.jsonl` files before rebuilding the vector index.
 
 ### 2026-07-06
 

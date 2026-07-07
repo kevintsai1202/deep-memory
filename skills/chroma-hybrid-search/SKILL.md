@@ -67,13 +67,14 @@ Best for finding exact proper nouns, variable names, or code snippets:
 <PY> skills/chroma-hybrid-search/scripts/search.py --query "pxmin pxmax" --mode bm25
 ```
 
-### 4. Scoped to One Skill or Tag
-Cold-store entries carry `skill` and `tags` metadata; `experience/skill-[skill-id].md` files carry `skill` derived from their filename. Use `--skill` for an exact skill-id match, `--tag` to check the tags array (Chroma's native `$contains`, requires chromadb ≥1.5.0 — already pinned in requirements.txt). Both narrow the BM25 corpus and the vector `where` clause identically, so every retrieval method sees the same filtered candidate set:
+### 4. Scoped to One Skill, Tag, or Memory Type
+Cold-store entries carry `skill`, `tags`, and `memory_type` metadata; `experience/skill-[skill-id].md` files carry `skill` derived from their filename, and hot-store entries are tagged as `knowledge` or `experience` by source folder. Use `--skill` for an exact skill-id match, `--tag` to check the tags array (Chroma's native `$contains`, requires chromadb ≥1.5.0 — already pinned in requirements.txt), and `--memory-type` to separate general knowledge from skill/tool experience. These filters narrow the BM25 corpus and the vector `where` clause identically, so every retrieval method sees the same filtered candidate set:
 ```bash
 <PY> skills/chroma-hybrid-search/scripts/search.py --query "session timeout" --skill backend-dev
 <PY> skills/chroma-hybrid-search/scripts/search.py --query "config drift"     --tag redis
+<PY> skills/chroma-hybrid-search/scripts/search.py --query "agent browser fill fallback" --memory-type experience
 ```
-Plain `knowledge-base/*.md` category files have no single skill/tag (they mix many topics), so they're never excluded by these filters — only `experience/*.md` and cold-store entries carry this metadata.
+Plain `knowledge-base/*.md` category files have no single skill/tag (they mix many topics), so they're never included by `--skill` or `--tag` filters unless the indexed entry explicitly has that metadata; they do participate in `--memory-type knowledge`.
 
 ---
 

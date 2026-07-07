@@ -141,10 +141,15 @@ If no topic switch occurred, reuse `last_matched_categories` — do not re-read 
 At the end of every turn that exchanged any real content, write it to the cold store. Do not gate this on a "substantial enough" judgment call — that filtering is what refinement does later, with hindsight and volume; deciding it at write time defeats the point of having a cold store at all.
 
 ```bash
-<PY> skills/chroma-hybrid-search/scripts/write_cold.py --topic "..." --content "..." --tags "..." --skill "..."
+<PY> skills/chroma-hybrid-search/scripts/write_cold.py --topic "..." --content "..." --tags "..." --skill "..." --memory-type "knowledge|experience|both"
 ```
 
 `write_cold.py` needs no dependencies beyond the standard library — no `.venv`, no `pip install`. A plain `python`/`python3` works, so this runs from the very first turn regardless of whether the chroma-hybrid-search environment (needed only for *searching*, not for writing) has been set up yet.
+
+Classify the note before writing:
+- `knowledge`: reusable facts, principles, SOPs, project rules, architecture decisions, or domain knowledge that do not depend on one specific skill being active.
+- `experience`: a reproducible lesson from using a specific skill/tool/repo, including pitfalls, exact errors, validation commands, key parameters, or next-time workflow.
+- `both`: one event contains both a general rule and a skill-specific lesson; keep the cold note whole, then split it into one knowledge entry and one experience entry during refinement.
 
 Skip only if the turn had nothing to record (a bare acknowledgment, no other content exchanged). For the exact write conventions and the cold→hot refinement workflow, read `resources/cold-store-and-vectorization.md`.
 
@@ -155,13 +160,14 @@ Skip only if the turn had nothing to record (a bare acknowledgment, no other con
 
 **You must execute the following steps:**
 1. **Summarize the experience**: Distill the solution into a single sentence.
-2. **Assess value**: Will this experience save the user time next time?
-3. **Proactively ask** — say something like:
+2. **Classify the memory target**: decide `knowledge-base`, `experience`, or both. If both, split the same event into a general knowledge entry and a skill-specific experience entry rather than forcing both concerns into one record.
+3. **Assess value**: Will this experience save the user time next time?
+4. **Proactively ask** — say something like:
    > "We just solved [problem description]. I'd like to record this in your knowledge base for quick reference next time. Is that okay?"
-4. **Write the record** after user confirmation, following these rules:
+5. **Write the record** after user confirmation, following these rules:
    - **Cross-skill experience**: If a non-deep-memory skill was used and is absent from (or has new techniques in) the experience store → write to `experience/skill-[skill-id].md`, update `experience/_index.json`
    - **General knowledge**: If it is a reusable workflow/preference/solution → write to `knowledge-base/[category].md`, update `knowledge-base/_index.json`
-5. **Remind user to sync**: After writing, prompt the user to run these two steps:
+6. **Remind user to sync**: After writing, prompt the user to run these two steps:
    ```bash
    # ① Rebuild the local vector index (so RAG can find the new record)
    <PY> skills/chroma-hybrid-search/scripts/update_db.py
@@ -220,6 +226,25 @@ The script prints the absolute path of the generated HTML on success. Tell the u
 **Panels**: a tripartite knowledge graph (category ── term ── project) where knowledge/experience categories, projects, and shared keyword/tag terms are colour-coded and bridge terms (both keyword and tag) are highlighted — with drag, pan, zoom, search, click-to-focus, hover labels, and type toggles — plus per-category size, cold-notes timeline, tag heat Top-N, project distribution, and quality (raw vs reviewed) ratio.
 
 This is on-demand only; it reads existing data and never modifies the memory store.
+
+---
+
+## Cold Store Migration
+
+When upgrading an existing install that already has `cold-notes/raw.jsonl`, backfill `memory_type` before rebuilding the vector index:
+
+```bash
+# Preview
+python skills/deep-memory/scripts/migrate_memory_type.py --dry-run
+
+# Apply to the default ~/.deep-memory workspace; creates a timestamped .bak backup first
+python skills/deep-memory/scripts/migrate_memory_type.py
+
+# Then refresh the vector metadata and searchable text
+<PY> skills/chroma-hybrid-search/scripts/update_db.py
+```
+
+The migration is idempotent. It preserves invalid JSONL lines as-is, only updates entries missing a valid `memory_type`, and infers `knowledge` for `general` / `deep-memory` / empty skill values and `experience` for other skill IDs.
 
 ---
 

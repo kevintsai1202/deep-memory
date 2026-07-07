@@ -32,7 +32,8 @@
   --topic "FastAPI session lost across requests" \
   --content "Root cause: default StatelessSession. Fix: use RedisSessionMiddleware. Steps: 1. pip install redis-py 2. Set SESSION_SECRET_KEY" \
   --tags "fastapi,session,redis,middleware" \
-  --skill "backend-dev"
+  --skill "backend-dev" \
+  --memory-type "experience"
 ```
 
 > ⚠️ **Important distinction: JSONL write ≠ vectorization**
@@ -40,6 +41,8 @@
 > - You must separately run `update_db.py` to vectorize the cold store and make it RAG-searchable.
 >
 > **Global store, project-tagged entries:** `write_cold.py`, `update_db.py`, and `search.py` all default `--workspace` to `~/.deep-memory` — every project's memory lives in one shared home-directory store now, not scattered per-project. Each cold-store entry still records which project it came from via an auto-filled `project` field (derived from the calling directory's name), so `search.py` can search the current project first and only fall back to the full store when nothing project-specific matches. Entries written before this change have no `project` field and are reachable only through that fallback pass — they were intentionally left as-is, not backfilled.
+>
+> **Knowledge vs. experience routing:** new cold-store entries should also carry `memory_type` (`knowledge`, `experience`, or `both`). Use `knowledge` for reusable rules/SOPs/domain facts, `experience` for skill/tool/repo-specific pitfalls and verified workflows, and `both` when refinement should split one raw event into two hot-store records.
 
 ---
 
@@ -95,7 +98,7 @@ If the cold store has entries written since the last `update_db.py` run, a RAG q
 ### Refinement Workflow
 
 1. **Read the cold store**: Agent reads all entries from `cold-notes/raw.jsonl`
-2. **Cluster analysis**: Group by `tags` and `skill` fields to identify recurring themes
+2. **Cluster analysis**: Group by `memory_type`, `tags`, and `skill` fields to identify recurring themes
 3. **Draft hot store entries**: For each high-frequency cluster, generate a structured MD draft:
    ```markdown
    ## 🔧 [Distilled pattern title]
@@ -108,6 +111,9 @@ If the cold store has entries written since the last `update_db.py` run, a RAG q
 4. **Ask for user confirmation**:
    > "I've organized [N] entries on [topic] from the cold store. Here's the distilled draft — shall I write this to the hot store?"
 5. **Write to hot store** after confirmation — update the corresponding MD file and `_index.json`
+   - `memory_type=knowledge` → write to `knowledge-base/[category].md`
+   - `memory_type=experience` → write to `experience/skill-[skill-id].md`
+   - `memory_type=both` → split into one general knowledge entry and one skill-specific experience entry
 6. **Mark cold store entries**: Tag refined entries with `"quality": "reviewed"` (do not delete — preserve history)
 7. **Rebuild the index and spot-check (verification — refinement is NOT complete without this)**:
    run `update_db.py` to re-index, then verify retrieval with a `search.py` query using

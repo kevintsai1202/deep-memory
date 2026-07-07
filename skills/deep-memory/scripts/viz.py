@@ -81,6 +81,7 @@ def load_data(workspace):
                 "tags": [t for t in o.get("tags", []) if isinstance(t, str)],
                 "skill": o.get("skill", ""),
                 "project": o.get("project", ""),
+                "memory_type": o.get("memory_type", "(未標)"),
                 "quality": o.get("quality", ""),
             })
         if bad:
@@ -95,6 +96,7 @@ def aggregate_stats(coldnotes):
     timeline = Counter()
     tags = Counter()
     projects = Counter()
+    memory_types = Counter()
     quality = Counter()
     for n in coldnotes:
         if n.get("date"):
@@ -102,6 +104,7 @@ def aggregate_stats(coldnotes):
         for t in n.get("tags", []):
             tags[t] += 1
         projects[n.get("project") or "(未標)"] += 1
+        memory_types[n.get("memory_type") or "(未標)"] += 1
         quality[n.get("quality") or "(未標)"] += 1
 
     def _desc(counter):
@@ -112,6 +115,7 @@ def aggregate_stats(coldnotes):
         "timeline": [[k, timeline[k]] for k in sorted(timeline)],
         "tags": _desc(tags),
         "projects": _desc(projects),
+        "memory_types": _desc(memory_types),
         "quality": _desc(quality),
     }
 
@@ -315,6 +319,7 @@ def render_html(data, stats, nodes, edges, positions, top_tags=20):
             "timeline": stats.get("timeline", []),
             "tags": stats.get("tags", [])[:top_tags],
             "projects": stats.get("projects", []),
+            "memory_types": stats.get("memory_types", []),
             "quality": stats.get("quality", []),
         },
         "graph": {"nodes": nodes, "edges": edges, "positions": positions},
@@ -702,6 +707,7 @@ barChart(card("📊 各分類關鍵字數"), D.categories.map(c => [c.title || c
 barChart(card("📈 cold notes 時間趨勢"), D.stats.timeline);
 barChart(card("🏷️ 標籤熱度 Top"), D.stats.tags);
 barChart(card("📁 專案分布"), D.stats.projects);
+barChart(card("🧭 記憶類型佔比"), D.stats.memory_types);
 barChart(card("🔄 品質佔比（raw/reviewed）"), D.stats.quality);
 </script>
 </body>

@@ -15,6 +15,19 @@ from datetime import datetime
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
+
+def resolve_memory_type(memory_type, skill):
+    """依使用者指定或技能 ID 推斷冷庫條目的記憶類型。"""
+    if memory_type != "auto":
+        return memory_type
+
+    normalized_skill = (skill or "").strip().lower()
+    general_skills = {"", "general", "none", "deep-memory"}
+    if normalized_skill in general_skills:
+        return "knowledge"
+    return "experience"
+
+
 def main():
     parser = argparse.ArgumentParser(description="Append a raw note to cold store (cold-notes/raw.jsonl)")
     # 優先從環境變數 DEEP_MEMORY_WORKSPACE 取得工作目錄，否則預設為使用者家目錄下的 .deep-memory
@@ -28,6 +41,9 @@ def main():
     parser.add_argument("--content",    type=str, required=True,  help="詳細內容（可包含步驟、程式碼片段等）")
     parser.add_argument("--tags",       type=str, default="",     help="逗號分隔的標籤（如 backend,fastapi,session）")
     parser.add_argument("--skill",      type=str, default="general", help="觸發本條記錄的技能 ID（如 chroma-hybrid-search）")
+    parser.add_argument("--memory-type", type=str, default="auto",
+                        choices=["auto", "knowledge", "experience", "both"],
+                        help="記憶類型：knowledge=通用知識、experience=技能/工具經驗、both=精煉時需拆成兩筆；auto=依 skill 粗略推斷")
     parser.add_argument("--quality",    type=str, default="raw",
                         choices=["raw", "reviewed"],
                         help="品質標記：raw=原始、reviewed=已人工確認（精煉後使用）")
@@ -42,6 +58,7 @@ def main():
     # 專案名稱：未顯式指定時，以「實際觸發指令當下的工作目錄」推斷（而非 base_dir，
     # 因為 base_dir 現在固定指向 home 的全域儲存區，不同專案都寫進同一份檔案）
     project = args.project or os.path.basename(os.getcwd())
+    memory_type = resolve_memory_type(args.memory_type, args.skill)
 
     # 建立條目
     entry = {
@@ -51,6 +68,7 @@ def main():
         "content": args.content,
         "tags":    [t.strip() for t in args.tags.split(",") if t.strip()],
         "skill":   args.skill,
+        "memory_type": memory_type,
         "project": project,
         "quality": args.quality
     }
@@ -64,6 +82,7 @@ def main():
         count = sum(1 for line in f if line.strip())
 
     print(f"[OK] 冷庫已寫入：{args.topic}（專案：{project}）")
+    print(f"[INFO] 記憶類型：{memory_type}")
     print(f"[INFO] 冷庫目前共 {count} 筆條目")
 
     # 精煉提醒閾值：≥ 20 筆時提醒（憑經驗選擇的中間值——夠小才不會讓冷庫無限累積
@@ -72,7 +91,7 @@ def main():
     if count >= REFINE_THRESHOLD:
         print()
         print(f"[⚠️ 精煉提示] 冷庫已累積 {count} 筆原始記錄（≥ {REFINE_THRESHOLD} 筆）。")
-        print("  建議執行精煉流程，將高頻/高價值條目蒸餾到熱庫（knowledge-base/）。")
+        print("  建議執行精煉流程，依 memory_type 將高頻/高價值條目分流到 knowledge-base/ 或 experience/。")
         print("  請告知 Agent：「幫我精煉冷庫」")
 
 if __name__ == "__main__":

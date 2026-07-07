@@ -96,6 +96,8 @@ def main():
         # Chroma 的陣列型 metadata 不允許空陣列，沒有標籤就整個欄位省略
         if doc.get("tags"):
             meta["tags"] = doc["tags"]
+        if doc.get("memory_type"):
+            meta["memory_type"] = doc["memory_type"]
         # 舊條目（改動前寫入的冷庫記錄）沒有 project，省略此欄位，
         # 讓 search.py 篩選專案時能與「無專案」的舊資料區分開來
         if doc.get("project"):

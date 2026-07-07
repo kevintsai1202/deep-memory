@@ -71,11 +71,12 @@ def read_knowledge_base(base_dir):
         # experience/skill-[skill-id].md 的 skill-id 從檔名取得，套用到該檔案切出的每個條目
         skill_match = _SKILL_FROM_FILENAME.match(os.path.basename(f))
         skill = skill_match.group(1) if skill_match else None
+        memory_type = "experience" if skill else "knowledge"
 
         entries = split_entries(content)
         if not entries:
             # 不符 "## 🔧" 範本的舊檔案／自訂檔案：整份當一份文件索引，維持向下相容
-            doc = {"path": rel_path, "text": content, "source": "hot"}
+            doc = {"path": rel_path, "text": content, "source": "hot", "memory_type": memory_type}
             if skill:
                 doc["skill"] = skill
             docs.append(doc)
@@ -92,7 +93,8 @@ def read_knowledge_base(base_dir):
             doc = {
                 "path": f"{rel_path}#{slug}",
                 "text": entry_text,
-                "source": "hot"
+                "source": "hot",
+                "memory_type": memory_type
             }
             if skill:
                 doc["skill"] = skill
@@ -101,6 +103,18 @@ def read_knowledge_base(base_dir):
                 doc["tags"] = tags
             docs.append(doc)
     return docs
+
+
+def infer_memory_type(entry):
+    """從舊版冷庫條目推斷記憶類型，讓未補欄位的歷史資料可維持可搜尋與可精煉。"""
+    memory_type = entry.get("memory_type")
+    if memory_type in {"knowledge", "experience", "both"}:
+        return memory_type
+
+    skill = (entry.get("skill") or "").strip().lower()
+    if skill in {"", "general", "none", "deep-memory"}:
+        return "knowledge"
+    return "experience"
 
 
 def read_cold_notes(base_dir):
@@ -118,9 +132,11 @@ def read_cold_notes(base_dir):
             try:
                 entry = json.loads(line)
                 tags_str = ", ".join(entry.get("tags", []))
+                memory_type = infer_memory_type(entry)
                 text = (
                     f"主題：{entry.get('topic', '')}\n"
                     f"日期：{entry.get('date', '')}\n"
+                    f"記憶類型：{memory_type}\n"
                     f"技能：{entry.get('skill', 'general')}\n"
                     f"標籤：{tags_str}\n"
                     f"內容：{entry.get('content', '')}"
@@ -130,7 +146,8 @@ def read_cold_notes(base_dir):
                     "text": text,
                     "source": "cold",
                     "tags": entry.get("tags", []),
-                    "skill": entry.get("skill", "general")
+                    "skill": entry.get("skill", "general"),
+                    "memory_type": memory_type
                 }
                 # project 欄位是後補的：寫入時間早於此改動的舊條目沒有這個 key，
                 # 這裡刻意用 entry.get() 而不給預設值，讓舊條目維持「不屬於任何專案」，

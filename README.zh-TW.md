@@ -111,6 +111,7 @@ skills/
 ├── cold-notes/
 │   └── raw.jsonl                # 冷庫：即寫即用，累積到閾值後精煉升級至熱庫。
 │                                 # 每筆條目會自動標記 project 欄位（取自觸發指令當下的目錄名稱），
+│                                 # 並標記 memory_type（knowledge / experience / both），
 │                                 # 讓 search.py 能先比對當前專案，找不到才退回全庫搜尋
 ├── chroma_hybrid_db/            # 本地編譯之 ChromaDB 二進位（熱庫＋冷庫皆會索引）
 └── backup/                      # memory-backup 暫存區（獨立 git 倉庫，推送至 GitHub）
@@ -182,6 +183,11 @@ npx skills add kevintsai1202/deep-memory --skill deep-memory -a claude-code -g
 ---
 
 ## Changelog
+
+### 2026-07-07
+
+- 冷庫條目新增 `memory_type`（`knowledge` / `experience` / `both`），精煉時可把通用知識分流到 `knowledge-base/`，把技能/工具踩坑經驗分流到 `experience/skill-[skill-id].md`，避免全部混成同一類。`write_cold.py` 支援 `--memory-type`，`search.py` 支援 `--memory-type` 篩選，記憶儀表板也新增記憶類型佔比面板。
+- 新增 `skills/deep-memory/scripts/migrate_memory_type.py`，可替既有 `cold-notes/raw.jsonl` 回填 `memory_type`，再重建向量索引。
 
 ### 2026-07-06
 

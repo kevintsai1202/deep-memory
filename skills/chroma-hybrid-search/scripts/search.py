@@ -45,6 +45,8 @@ def run_search(docs, collection, args, query_embedding=None, extra_where=None):
         where_clauses.append({"skill": args.skill})
     if args.tag:
         where_clauses.append({"tags": {"$contains": args.tag}})
+    if args.memory_type:
+        where_clauses.append({"memory_type": args.memory_type})
     if extra_where:
         where_clauses.append(extra_where)
     where = where_clauses[0] if len(where_clauses) == 1 else ({"$and": where_clauses} if where_clauses else None)
@@ -137,6 +139,9 @@ def main():
     parser.add_argument("--workspace", type=str, default=default_ws, help="Workspace root path")
     parser.add_argument("--skill", type=str, default=None, help="Filter to entries tagged with this skill-id (exact match)")
     parser.add_argument("--tag", type=str, default=None, help="Filter to entries whose tags array contains this value")
+    parser.add_argument("--memory-type", type=str, default=None,
+                        choices=["knowledge", "experience", "both"],
+                        help="Filter cold-store entries by memory_type")
     parser.add_argument("--project", type=str, default=None,
                         help="限定搜尋範圍為此專案；未指定時自動取當前工作目錄的資料夾名稱。傳 'all' 或空字串可停用專案篩選、直接搜全部")
     args = parser.parse_args()
@@ -149,6 +154,8 @@ def main():
         all_docs = [d for d in all_docs if d.get("skill") == args.skill]
     if args.tag:
         all_docs = [d for d in all_docs if args.tag in d.get("tags", [])]
+    if args.memory_type:
+        all_docs = [d for d in all_docs if d.get("memory_type") == args.memory_type]
 
     if not all_docs:
         print(json.dumps({"error": f"No documents found matching the given filters at {base_dir}."}))

@@ -4,7 +4,17 @@
 
 ## Recording Criteria
 
-**Step 1 — Which bucket?** One litmus test: does this only make sense in the context of a specific skill (`skill-id`)? → `experience`. Does it generalize across skills/domains, with no dependency on any particular skill being invoked? → `knowledge-base`. (Example: a Spring Boot testing gotcha that only applies while using a specific testing skill is `experience`; the same lesson restated as a general JUnit/Spring pattern that holds regardless of which skill is active is `knowledge-base`.)
+**Step 1 — Which bucket?** One litmus test: does this only make sense in the context of a specific skill (`skill-id`)? → `experience`. Does it generalize across skills/domains, with no dependency on any particular skill being invoked? → `knowledge-base`. If one solved event contains both a general rule and a skill-specific tactic, mark the cold note as `both` and split it into two hot-store entries during refinement. (Example: a Spring Boot testing gotcha that only applies while using a specific testing skill is `experience`; the same lesson restated as a general JUnit/Spring pattern that holds regardless of which skill is active is `knowledge-base`.)
+
+### Cold Store `memory_type`
+
+Every cold-store write should include a `memory_type` so later refinement can route entries correctly:
+
+| memory_type | Use when | Hot-store target |
+|---|---|---|
+| `knowledge` | Reusable facts, project rules, architecture decisions, SOPs, domain rules, or user preferences | `knowledge-base/[category].md` |
+| `experience` | A reproducible lesson from a specific skill/tool/repo, including pitfalls, exact errors, commands, parameters, and validation evidence | `experience/skill-[skill-id].md` |
+| `both` | The same event contains a general rule and a skill-specific workflow | Split into one `knowledge-base` entry and one `experience` entry |
 
 **Step 2 — Is it worth recording at all?** Core question: Will this save the user time next time?
 
