@@ -241,16 +241,23 @@ def write_run_log(base_dir, record):
 
     採 JSONL 而非人類可讀格式，是為了讓「這半年索引變慢過幾次、各是什麼原因」
     能直接用程式彙總。單行約 300 bytes，每日十次執行一年約 1 MB，不需輪替。
+
+    I/O 失敗時吞掉例外、印警告、回傳 None：日誌的目的是觀測，觀測工具的失敗
+    （例如 Windows 檔案鎖或防毒短暫佔用）不該破壞它要觀測的東西（已完成的索引）。
     """
-    log_dir = os.path.join(str(base_dir), "logs")
-    os.makedirs(log_dir, exist_ok=True)
-    path = os.path.join(log_dir, "index-runs.jsonl")
-    payload = {"ts": datetime.now().isoformat(timespec="seconds"),
-               "schema_version": SCHEMA_VERSION}
-    payload.update(record)
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    return path
+    try:
+        log_dir = os.path.join(str(base_dir), "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        path = os.path.join(log_dir, "index-runs.jsonl")
+        payload = {"ts": datetime.now().isoformat(timespec="seconds"),
+                   "schema_version": SCHEMA_VERSION}
+        payload.update(record)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        return path
+    except OSError as e:
+        print(f"[警告] 索引日誌寫入失敗，但索引本身已完成：{e}")
+        return None
 
 
 def format_anomaly_warning(plan, total):

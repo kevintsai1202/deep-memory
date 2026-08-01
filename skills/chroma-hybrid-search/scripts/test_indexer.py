@@ -276,6 +276,13 @@ class TestRunLog(unittest.TestCase):
         self.assertIn("ts", record)
         self.assertEqual(record["schema_version"], indexer.SCHEMA_VERSION)
 
+    def test_io_error_returns_none_without_raising(self):
+        # 無效的路徑（含禁用的路徑分隔符號 | 會導致 OSError）應該回傳 None 而非拋例外
+        # 這個測試確保日誌失敗時不會中止已完成的索引
+        invalid_path = "invalid|path"  # | 在所有作業系統都不允許在檔案名稱中
+        result = indexer.write_run_log(invalid_path, {"trigger": "test", "total": 1, "embedded": 0})
+        self.assertIsNone(result)
+
 
 class TestAnomalyWarning(unittest.TestCase):
     def _plan_with(self, embed_count, reasons):
@@ -292,7 +299,14 @@ class TestAnomalyWarning(unittest.TestCase):
         plan = self._plan_with(30, {"new": 0, "text-changed": 0, "id-missing": 30})
         warning = indexer.format_anomaly_warning(plan, total=100)
         self.assertIsNotNone(warning)
-        self.assertIn("id-missing", warning)
+        self.assertIn("kb_reader.py", warning)
+
+    def test_warns_at_threshold_boundary(self):
+        # 剛好 20% 應該觸發警告（ratio >= ANOMALY_RATIO）
+        plan = self._plan_with(20, {"new": 0, "text-changed": 0, "id-missing": 20})
+        warning = indexer.format_anomaly_warning(plan, total=100)
+        self.assertIsNotNone(warning)
+        self.assertIn("20%", warning)
 
     def test_no_warning_when_collection_is_empty(self):
         # 首次建庫全部都是新條目，不該被當成異常
