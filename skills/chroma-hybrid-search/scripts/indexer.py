@@ -78,10 +78,14 @@ def _backup_db(db_path):
     """遷移前完整複製資料庫目錄，讓任何中斷都能原樣還原。
 
     27 MB 規模下實測約 0.06 秒，這個保險非常便宜。
-    db_path 為 None 時（記憶體測試）跳過。
+    db_path 為 None 時（記憶體測試）跳過；db_path 有給值但不是目錄時 raise，
+    不能悄悄跳過——正式環境下若因路徑打錯或資料庫還沒建立就無聲略過備份，
+    遷移會在對著使用者不可重建的記憶庫、毫無保護的情況下照跑。
     """
-    if not db_path or not os.path.isdir(db_path):
+    if db_path is None:
         return None
+    if not os.path.isdir(db_path):
+        raise RuntimeError(f"[遷移] 備份失敗：db_path 不是目錄（收到：{db_path}）")
     import shutil
     from datetime import datetime
     dest = f"{db_path}.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
@@ -110,17 +114,43 @@ def migrate_to_v2(collection, db_path, cold_docs):
     data = collection.get(ids=legacy_ids, include=["embeddings", "documents", "metadatas"])
     by_text = {d["text"]: d for d in cold_docs}
 
-    new_ids, embs, docs_out, metas, migrated_old = [], [], [], [], []
+    new_ids, embs, docs_out, metas = [], [], [], []
     for i, old_id in enumerate(data["ids"]):
         target = by_text.get(data["documents"][i])
         if target is None:
-            # 來源已刪除的條目：不搬移，留給後續的孤立向量清理處理
+            # 來源已刪除的條目：不搬移，其舊 ID 會在下方連同其他 legacy ID 一併刪除。
+            # 不保留未配對的舊 ID 是刻意的——留著會讓 detect_schema 永遠停在舊版本，
+            # 導致每次 sync 都重新備份並重跑一次遷移。
             continue
         new_ids.append(target["path"])
         embs.append(data["embeddings"][i])
         docs_out.append(target["text"])
         metas.append(build_metadata(target))
-        migrated_old.append(old_id)
+
+    # 配對率過低（含 0）代表冷庫 text 組裝格式可能已變動，讓舊向量的 documents
+    # 對不上任何新 doc 的 text；默默只搬走配對上的那幾筆會讓其餘向量無聲孤立，
+    # 比直接中止更危險。門檻定得寬鬆（五成），只在明顯異常時才擋。
+    matched, total = len(new_ids), len(legacy_ids)
+    if matched < total * 0.5:
+        raise RuntimeError(
+            f"[遷移] 配對率過低已中止：legacy 有 {total} 筆、配對成功 {matched} 筆，"
+            f"未搬移任何向量；請檢查冷庫 text 組裝格式是否已變動"
+            + (f"，備份於 {backup}" if backup else ""))
+
+    # 兩筆以上 legacy 條目配對到同一個新 path，代表 raw.jsonl 本身有語意重複的行
+    # （不同行但雜湊相同）；不擋下的話 upsert 會丟出 chromadb 的 DuplicateIDError，
+    # 只吐一個裸雜湊值、看不出成因是 raw.jsonl 需要去重
+    seen, dupes = set(), set()
+    for target_id in new_ids:
+        if target_id in seen:
+            dupes.add(target_id)
+        else:
+            seen.add(target_id)
+    if dupes:
+        raise RuntimeError(
+            f"[遷移] 偵測到重複的目標 ID {sorted(dupes)}，代表 raw.jsonl 有語意重複的"
+            f"條目；請先在 raw.jsonl 去重再重跑遷移"
+            + (f"，備份於 {backup}" if backup else ""))
 
     for s in range(0, len(new_ids), 500):
         collection.upsert(ids=new_ids[s:s+500], embeddings=embs[s:s+500],

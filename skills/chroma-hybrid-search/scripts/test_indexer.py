@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """indexer 的 schema 偵測與增量比對測試（需 venv，會用到 chromadb 記憶體模式）"""
+import os
+import tempfile
 import unittest
 
 import chromadb
@@ -136,6 +138,32 @@ class TestBuildMetadata(unittest.TestCase):
         self.assertEqual(meta["line"], 723)
 
 
+class TestBackupDb(unittest.TestCase):
+    """_backup_db 保護的是使用者無法重建的正式資料庫，三種行為都必須有測試釘住"""
+
+    def test_real_directory_is_copied_with_identical_content(self):
+        with tempfile.TemporaryDirectory() as parent:
+            src = os.path.join(parent, "db")
+            os.mkdir(src)
+            with open(os.path.join(src, "data.bin"), "w", encoding="utf-8") as f:
+                f.write("hello")
+            dest = indexer._backup_db(src)
+            self.assertTrue(os.path.isdir(dest))
+            with open(os.path.join(dest, "data.bin"), "r", encoding="utf-8") as f:
+                self.assertEqual(f.read(), "hello")
+
+    def test_none_path_skips_backup(self):
+        # 記憶體測試（db_path=None）不該嘗試備份，也不該報錯
+        self.assertIsNone(indexer._backup_db(None))
+
+    def test_non_directory_path_raises(self):
+        # 路徑打錯或資料庫還沒建立時必須 raise，不能無聲跳過保護
+        with tempfile.TemporaryDirectory() as parent:
+            missing = os.path.join(parent, "does-not-exist")
+            with self.assertRaises(RuntimeError):
+                indexer._backup_db(missing)
+
+
 class TestMigrateToV2(unittest.TestCase):
     """遷移必須零重算：只換 ID 與補 metadata，向量原封搬移"""
 
@@ -193,9 +221,10 @@ class TestMigrateToV2(unittest.TestCase):
                      if i.startswith(indexer.LEGACY_COLD_PREFIX)]
         self.assertEqual(remaining, [])
 
-    def test_entries_with_deleted_source_are_left_for_stale_cleanup(self):
-        # 來源已被刪除的舊條目沒有對應的新 doc，遷移不搬它，
-        # 留給 build_plan 的孤立向量清理處理——不可在遷移階段悄悄丟失
+    def test_entries_with_deleted_source_are_dropped(self):
+        # 來源已被刪除的舊條目沒有對應的新 doc，遷移不搬它；
+        # 其舊 ID 一併清除，不留孤兒——留著會讓 detect_schema 永遠停在舊版本，
+        # 導致每次 sync 都重新備份並重跑一次遷移
         col = indexer.migrate_to_v2(self._legacy_collection(), None,
                                     [doc("cold-notes#111111111111", "冷一", "111111111111", line=1)])
         ids = set(col.get(include=[])["ids"])
