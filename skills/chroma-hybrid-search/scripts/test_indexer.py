@@ -8,13 +8,18 @@ import indexer
 
 
 def make_collection(name="col"):
-    """每個測試用獨立的記憶體 client，避免相互汙染"""
+    """
+    創建一個新的空 Chroma 集合用於測試。
+
+    EphemeralClient() 會落到共享的 in-memory System 快取（key 為固定的 "ephemeral"），
+    因此同一 process 內多次呼叫拿到的是同一個 in-memory database。
+    為隔離測試，在創建同名新集合前先刪除舊集合（若存在）。
+    """
     client = chromadb.EphemeralClient()
-    # 使用 get_or_create 而非 create，避免重複創建時的衝突
-    # 每次測試開始前手動清理集合內容
     try:
         client.delete_collection(name)
-    except:
+    except chromadb.errors.NotFoundError:
+        # 集合不存在是預期情況，只在第一個測試時發生
         pass
     return client.create_collection(name)
 
