@@ -365,6 +365,10 @@ def sync(base_dir, trigger="update_db", rebuild=False, verbose=True):
     trigger 記錄呼叫來源（update_db / search-auto），寫進日誌以便區分
     「使用者手動跑」與「搜尋時自動補」兩種情境的耗時分佈。
     rebuild=True 時強制重算全部條目（遷移後想讓向量與新文字格式完全對應時使用）。
+
+    回傳 dict 的 backfilled 欄位記錄本次 backfill_hot_entries 實際回填的
+    熱庫筆數：這跟 reasons 一樣是診斷訊號，寫進 index-runs.jsonl 才能在
+    事後追溯「這次遷移到底補了多少筆」，不必只靠 console 輸出。
     """
     import time
     import chromadb
@@ -404,10 +408,11 @@ def sync(base_dir, trigger="update_db", rebuild=False, verbose=True):
     # 平行呼叫，兩者才會各自在需要時都執行到。等所有條目的
     # schema_version 皆為 SCHEMA_VERSION 後，detect_schema 才會回報
     # 最新版本，本區塊屆時就不會再被進入。
+    backfilled = 0
     if detect_schema(collection) < SCHEMA_VERSION:
         t = time.time()
         collection = migrate_to_v2(collection, db_path, cold_docs)
-        backfill_hot_entries(collection)
+        backfilled = backfill_hot_entries(collection)
         timing["migrate"] = round(time.time() - t, 2)
 
     t = time.time()
@@ -459,6 +464,10 @@ def sync(base_dir, trigger="update_db", rebuild=False, verbose=True):
         "meta_only": len(plan.meta_ids),
         "skipped": plan.skipped,
         "stale": len(plan.stale_ids),
+        # 回填筆數是跟 text-changed 同一類的診斷訊號——當初 337 筆熱庫被
+        # 誤重算，正是靠 index-runs.jsonl 裡的 reasons 才被發現的；回填
+        # 筆數若只印在 console 就消失，同一類問題下次會更難從日誌重建現場。
+        "backfilled": backfilled,
         "reasons": plan.reasons,
         "timing": timing,
     }

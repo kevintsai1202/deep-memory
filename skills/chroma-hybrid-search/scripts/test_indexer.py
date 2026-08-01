@@ -331,6 +331,86 @@ class TestBackfillHotEntries(unittest.TestCase):
         self.assertEqual(meta["content_hash"], "keepme000001")
 
 
+class TestSyncPartialMigrationWiring(unittest.TestCase):
+    """守住 backfill_hot_entries 與 migrate_to_v2 在 sync() 裡的呼叫順序契約。
+
+    TestBackfillHotEntries 的三個測試都直接呼叫
+    `indexer.backfill_hot_entries(col)`，從未經過 sync() 的
+    `if detect_schema(collection) < SCHEMA_VERSION:` 判斷；TestMigrateToV2
+    也從未在遷移後接著呼叫回填。這讓一個關鍵不變量沒有任何測試守著：
+    backfill_hot_entries 必須跟 migrate_to_v2 平行掛在 sync() 的同一個 if
+    區塊下，不能塞進 migrate_to_v2 內部——因為 migrate_to_v2 在「已無行號式
+    冷庫 ID」時會提早 return。若有人把回填邏輯「順手」搬進 migrate_to_v2
+    內部（看起來像合理的整理，畢竟兩者都在處理遷移），冷庫已遷移、熱庫仍是
+    v1 形狀的部分遷移庫就會靜默跳過回填，337 筆熱庫誤重算的回歸會重演，
+    而其餘 47 個測試一個都測不出來。
+
+    這裡刻意直接呼叫真正的 sync()，而不是分別呼叫 migrate_to_v2 /
+    backfill_hot_entries 模擬呼叫順序——手動模擬測的是「兩個函式接續呼叫
+    可以運作」，測不出「回填被搬進 migrate_to_v2 內部」這種重構造成的
+    退化，只有真正跑一次 sync() 才能守住它內部的實際接法。
+
+    刻意讓來源檔案與預先塞入 collection 的內容完全一致（沒有任何新增或
+    真正變動的條目），使 plan.embed_ids 維持空清單，sync() 就不會進入需要
+    載入真正 ONNX 模型的分支——測試因此不依賴模型檔案是否存在、也跑得快。
+
+    用 tempfile.mkdtemp()（而非 tempfile.TemporaryDirectory() 情境管理器）
+    建立工作目錄：實測 chromadb 的 PersistentClient 在 Windows 上會讓
+    sqlite 資料檔維持在被佔用狀態，結束 with 區塊時刪除目錄會拋
+    PermissionError（WinError 32）。這與 TestRunLog 已經接受的取捨一致，
+    不在測試層級處理清理。
+    """
+
+    def test_hot_entries_not_reembedded_when_cold_already_migrated(self):
+        workspace = tempfile.mkdtemp()
+
+        # 建最小熱庫來源檔：kb_reader 會跳過小於 200 bytes 的檔案，
+        # 內容需湊到門檻以上
+        kb_dir = os.path.join(workspace, "knowledge-base")
+        os.makedirs(kb_dir)
+        entry_body = "## 🔧 測試條目標題\n\n" + ("湊字數用的示範內容。" * 20)
+        with open(os.path.join(kb_dir, "demo.md"), "w", encoding="utf-8") as f:
+            f.write("# 熱庫示範檔\n\n" + entry_body)
+
+        # 建最小冷庫來源檔
+        cold_dir = os.path.join(workspace, "cold-notes")
+        os.makedirs(cold_dir)
+        cold_entry = {"topic": "測試主題", "date": "2026-08-01", "skill": "general",
+                      "tags": ["demo"], "content": "測試內容", "memory_type": "knowledge"}
+        with open(os.path.join(cold_dir, "raw.jsonl"), "w", encoding="utf-8") as f:
+            f.write(json.dumps(cold_entry, ensure_ascii=False) + "\n")
+
+        # 直接用 production 的讀取邏輯算出真正的 id / hash / text，讓預先
+        # 塞進 collection 的內容與 sync() 之後自己重新讀到的來源完全一致
+        hot_doc = kb_reader.read_knowledge_base(workspace)[0]
+        cold_doc = kb_reader.read_cold_notes(workspace)[0]
+
+        # 預先塞入「部分遷移」狀態：冷庫已是內容定址新 ID、完整 v2
+        # metadata；熱庫仍是 v1 形狀（只有 path/source/memory_type，
+        # 沒有 content_hash、沒有 schema_version）
+        db_path = os.path.join(workspace, "chroma_hybrid_db")
+        client = chromadb.PersistentClient(path=db_path)
+        collection = client.get_or_create_collection("hybrid_docs")
+        collection.upsert(
+            ids=[cold_doc["path"], hot_doc["path"]],
+            embeddings=[[0.1, 0.2], [0.3, 0.4]],
+            documents=[cold_doc["text"], hot_doc["text"]],
+            metadatas=[indexer.build_metadata(cold_doc),
+                       {"path": hot_doc["path"], "source": "hot",
+                        "memory_type": hot_doc.get("memory_type")}],
+        )
+        # 確認前提成立：這確實是需要遷移的部分遷移狀態，不是已經是 v2
+        self.assertLess(indexer.detect_schema(collection), indexer.SCHEMA_VERSION)
+
+        result = indexer.sync(workspace, trigger="test", verbose=False)
+
+        # 核心斷言：熱庫條目不能落入 text-changed、也不需要任何重算
+        self.assertEqual(result["reasons"]["text-changed"], 0)
+        self.assertEqual(result["embedded"], 0)
+        self.assertEqual(result["backfilled"], 1)
+        self.assertEqual(result["skipped"], 2)
+
+
 class TestRunLog(unittest.TestCase):
     def test_appends_one_json_line_per_run(self):
         base = Path(tempfile.mkdtemp())
