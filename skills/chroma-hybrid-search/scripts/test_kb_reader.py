@@ -99,6 +99,12 @@ class TestDocsCarryContentHash(unittest.TestCase):
         for doc in docs:
             self.assertRegex(doc["content_hash"], r"^[0-9a-f]{12}$")
 
+    def test_cold_doc_id_is_content_addressed(self):
+        # 冷庫 ID 必須是內容定址，行號降級為 line 欄位
+        docs = kb_reader.read_cold_notes(self._workspace())
+        self.assertEqual(docs[0]["path"], f"cold-notes#{docs[0]['content_hash']}")
+        self.assertEqual(docs[0]["line"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -180,14 +180,18 @@ def read_cold_notes(base_dir):
                     f"標籤：{tags_str}\n"
                     f"內容：{entry.get('content', '')}"
                 )
+                content_hash = semantic_hash(entry)
                 doc = {
-                    "path": f"cold-notes/raw.jsonl#L{i+1}",
+                    # 內容定址：行號會因刪改中間行而位移，位移會讓位移點之後
+                    # 的每一筆都被誤判為「新增 + 孤立」而觸發全庫重算
+                    "path": f"cold-notes#{content_hash}",
                     "text": text,
                     "source": "cold",
+                    "line": i + 1,        # 行號降級為 metadata，供人閱讀來源引用
                     "tags": entry.get("tags", []),
                     "skill": entry.get("skill", "general"),
                     "memory_type": memory_type,
-                    "content_hash": semantic_hash(entry)
+                    "content_hash": content_hash
                 }
                 # project 欄位是後補的：寫入時間早於此改動的舊條目沒有這個 key，
                 # 這裡刻意用 entry.get() 而不給預設值，讓舊條目維持「不屬於任何專案」，

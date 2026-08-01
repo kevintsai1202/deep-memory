@@ -136,5 +136,72 @@ class TestBuildMetadata(unittest.TestCase):
         self.assertEqual(meta["line"], 723)
 
 
+class TestMigrateToV2(unittest.TestCase):
+    """遷移必須零重算：只換 ID 與補 metadata，向量原封搬移"""
+
+    def _legacy_collection(self):
+        """建立一個含行號式 ID 的舊格式 collection。
+
+        必須沿用 make_collection 的 delete-then-create 隔離手法：chromadb 1.5.9 的
+        EphemeralClient 落在 key 寫死為 "ephemeral" 的 class-level 快取
+        （chromadb/api/shared_system_client.py:65-67），同一 process 內每次呼叫拿到的
+        是同一個 in-memory system——不先清掉同名 collection，第二個測試就會撞名失敗。
+        """
+        col = make_collection("legacy")
+        col.upsert(
+            ids=["cold-notes/raw.jsonl#L1", "cold-notes/raw.jsonl#L2", "kb.md#slug"],
+            embeddings=[[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
+            documents=["冷一", "冷二", "熱一"],
+            metadatas=[{"path": "cold-notes/raw.jsonl#L1", "source": "cold"},
+                       {"path": "cold-notes/raw.jsonl#L2", "source": "cold"},
+                       {"path": "kb.md#slug", "source": "hot"}],
+        )
+        return col
+
+    def _cold_docs(self):
+        return [doc("cold-notes#111111111111", "冷一", "111111111111", line=1),
+                doc("cold-notes#222222222222", "冷二", "222222222222", line=2)]
+
+    def test_ids_are_replaced_and_count_preserved(self):
+        col = indexer.migrate_to_v2(self._legacy_collection(), None, self._cold_docs())
+        self.assertEqual(col.count(), 3)
+        ids = set(col.get(include=[])["ids"])
+        self.assertEqual(ids, {"cold-notes#111111111111", "cold-notes#222222222222", "kb.md#slug"})
+
+    def test_embeddings_are_preserved_bit_for_bit(self):
+        col = indexer.migrate_to_v2(self._legacy_collection(), None, self._cold_docs())
+        got = col.get(ids=["cold-notes#111111111111"], include=["embeddings"])
+        self.assertAlmostEqual(float(got["embeddings"][0][0]), 0.1, places=6)
+        self.assertAlmostEqual(float(got["embeddings"][0][1]), 0.2, places=6)
+
+    def test_line_number_kept_in_metadata(self):
+        col = indexer.migrate_to_v2(self._legacy_collection(), None, self._cold_docs())
+        meta = col.get(ids=["cold-notes#222222222222"], include=["metadatas"])["metadatas"][0]
+        self.assertEqual(meta["line"], 2)
+        self.assertEqual(meta["schema_version"], indexer.SCHEMA_VERSION)
+
+    def test_migration_is_idempotent(self):
+        # 中途失敗後重跑不得損壞資料：第二次執行應為無操作
+        col = indexer.migrate_to_v2(self._legacy_collection(), None, self._cold_docs())
+        col = indexer.migrate_to_v2(col, None, self._cold_docs())
+        self.assertEqual(col.count(), 3)
+        # 驗證的是「不再有行號式 ID」，而不是「整庫已達 SCHEMA_VERSION」——
+        # migrate_to_v2 的職責只到冷庫 ID 換址為止，熱庫條目的 schema_version
+        # 是後續 build_plan 走 metadata-only 路徑（零 embedding 成本）補上的。
+        # 用 detect_schema 斷言會誤把「遷移未完成整個 sync 流程」判成遷移失敗。
+        remaining = [i for i in col.get(include=[])["ids"]
+                     if i.startswith(indexer.LEGACY_COLD_PREFIX)]
+        self.assertEqual(remaining, [])
+
+    def test_entries_with_deleted_source_are_left_for_stale_cleanup(self):
+        # 來源已被刪除的舊條目沒有對應的新 doc，遷移不搬它，
+        # 留給 build_plan 的孤立向量清理處理——不可在遷移階段悄悄丟失
+        col = indexer.migrate_to_v2(self._legacy_collection(), None,
+                                    [doc("cold-notes#111111111111", "冷一", "111111111111", line=1)])
+        ids = set(col.get(include=[])["ids"])
+        self.assertIn("cold-notes#111111111111", ids)
+        self.assertNotIn("cold-notes/raw.jsonl#L2", ids)
+
+
 if __name__ == "__main__":
     unittest.main()
