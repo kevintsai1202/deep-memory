@@ -5,7 +5,7 @@
 ## Contents
 
 - [Cold Store Write Rules](#cold-store-write-rules-when-to-write-to-cold-notes)
-- [Cold Store Vectorization](#cold-store-vectorization-when-to-run-update_dbpy)
+- [Cold Store Vectorization](#cold-store-vectorization-automatic-when-to-run-update_dbpy-by-hand)
 - [Reading the Cold Store: Through RAG, Not Directly](#reading-the-cold-store-through-rag-not-directly)
 - [Memory Refinement Process (Cold → Hot Distillation)](#memory-refinement-process-cold--hot-distillation)
 - [ChromaDB Vector Index Build & Rebuild Rules](#chromadb-vector-index-build--rebuild-rules)
@@ -36,9 +36,8 @@
   --memory-type "experience"
 ```
 
-> ⚠️ **Important distinction: JSONL write ≠ vectorization**
-> - `write_cold.py` only appends the entry to `cold-notes/raw.jsonl` (text backup). **RAG cannot search this data yet.**
-> - You must separately run `update_db.py` to vectorize the cold store and make it RAG-searchable.
+> **JSONL write and vectorization are separate steps, but you no longer have to bridge them by hand.**
+> `write_cold.py` only appends the entry to `cold-notes/raw.jsonl` (text backup) — at that instant RAG cannot find it yet. But `search.py` tops up the index before every query, so the next retrieval picks it up automatically. Run `update_db.py` yourself only to close that gap immediately rather than at the next search.
 >
 > **Global store, project-tagged entries:** `write_cold.py`, `update_db.py`, and `search.py` all default `--workspace` to `~/.deep-memory` — every project's memory lives in one shared home-directory store now, not scattered per-project. Each cold-store entry still records which project it came from via an auto-filled `project` field (derived from the calling directory's name), so `search.py` can search the current project first and only fall back to the full store when nothing project-specific matches. Entries written before this change have no `project` field and are reachable only through that fallback pass — they were intentionally left as-is, not backfilled.
 >
@@ -46,31 +45,36 @@
 
 ---
 
-## Cold Store Vectorization (When to Run update_db.py)
+## Cold Store Vectorization (Automatic; When to Run update_db.py by Hand)
 
-`update_db.py` indexes both the hot store (MD files) and cold store (raw.jsonl). Indexing is **incremental**: it only re-embeds entries that are new or whose text changed, updates metadata-only changes without re-embedding, and skips unchanged entries. Embedding runs on a lightweight ONNX path (`onnx_models.py`, no torch), and the model only loads when something actually needs re-embedding — a no-change run finishes in about 1 second. It is still good hygiene **not to trigger it after every write**; use the following rules:
+`update_db.py` indexes both the hot store (MD files) and cold store (raw.jsonl). Indexing is **incremental**: it only re-embeds entries that are new or whose content hash changed, applies metadata-only changes without re-embedding, and skips unchanged entries. Embedding runs on a lightweight ONNX path (`onnx_models.py`, no torch), and the model loads only when something actually needs re-embedding — a no-change run finishes in about 1–2 seconds.
 
-| When to Vectorize | Reason |
+**`search.py` runs this same incremental sync before every query**, so the index is never stale at retrieval time and you do not need to remind the user to vectorize. Pass `--no-auto-index` to disable it. An indexing failure prints a warning and never blocks the search.
+
+| Run `update_db.py` by hand when | Reason |
 |---|---|
-| **Hot store has new or modified content** (required) | RAG cannot find new hot store entries until the index is rebuilt |
-| **Cold store was written this session AND a RAG query is about to occur** | Lazy strategy — vectorize just before querying, avoid unnecessary compute |
-| **Cold store has accumulated ≥ 5 new entries** before the first query | Batch vectorization to reduce trigger frequency |
-| **Before a manual refinement or backup is requested** | Ensure the index and backup contents are consistent |
+| You want new entries searchable **immediately**, not at the next query | e.g. right after a refinement pass, before reporting success |
+| You want to see the index state and timings without issuing a query | The run prints the incremental breakdown and writes a log line |
+| Vectors must correspond exactly to the latest text format (`--rebuild`) | Full re-embed, ~6 minutes for a 1,265-entry store; never needed for normal operation |
 
-**Situations where update_db.py is NOT needed:**
-- Cold store JSONL was written, but no RAG query is needed this session
-- Running backup.py with no new knowledge written
-
-**Vectorization command:**
+**Command:**
 ```bash
 <PY> skills/chroma-hybrid-search/scripts/update_db.py
 ```
 
-**Agent reminder template (after cold store write, before next RAG query):**
-> "I've written this session's notes to the cold store. To make this data searchable via RAG, please run the vectorization first:"
-> ```bash
-> <PY> skills/chroma-hybrid-search/scripts/update_db.py
-> ```
+### Why deleting or editing a cold-store line is now cheap
+
+Cold-store entries are keyed by a semantic hash (`cold-notes#<hash12>`) covering `topic` / `content` / `tags` / `skill` / `memory_type` — **not** by line number, and deliberately **excluding** `date` / `time` / `project` / `quality` and every template string. Consequences worth knowing:
+
+- Deleting or inserting a line anywhere in `raw.jsonl` does **not** re-embed the entries after it. Measured on a 928-line store: removing the middle line re-embedded **0** entries — the 463 entries below it only had their `line` metadata refreshed, at zero embedding cost.
+- Marking an entry `quality: reviewed` during refinement does **not** trigger a re-embed, because `quality` is outside the hash.
+- Changing how the indexed text is assembled does **not** invalidate the whole store.
+
+The line number survives as `line` in metadata and is returned with every cold-store search hit, so results stay traceable to their source line.
+
+### Run log
+
+Every indexing run appends one JSON line to `~/.deep-memory/logs/index-runs.jsonl` with per-stage timings and a breakdown of why entries were re-embedded (`new` / `text-changed` / `id-missing`). A run that re-embeds more than 20% of the store prints a warning. When the reason is `id-missing`, the usual cause is that the repo copy and the `~/.claude/skills` installed copy of `kb_reader.py` are on different versions — they assemble the indexed text differently, so each sees the other's entries as changed.
 
 ---
 
@@ -80,7 +84,7 @@ Once `update_db.py` has vectorized the cold store, retrieve its content through 
 
 **The one exception is the refinement workflow below**, which reads `raw.jsonl` directly on purpose: it needs every entry's `tags`/`skill`/`date` fields to cluster them, and neither RAG's ranked-top-K-for-one-query model nor the vector index's metadata (which doesn't retain those fields) can support that.
 
-If the cold store has entries written since the last `update_db.py` run, a RAG query simply won't find them yet — that's a staleness gap to close by running `update_db.py` (see above), not a reason to fall back to reading `raw.jsonl` directly.
+Entries written since the last index run are no longer a staleness problem: `search.py` tops the index up before it queries, so a RAG query picks them up on its own. Either way, that was never a reason to fall back to reading `raw.jsonl` directly.
 
 ---
 

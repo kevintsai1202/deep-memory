@@ -39,7 +39,37 @@ When this skill is first invoked by the Agent or user, confirm that the `.venv` 
 
 > **Notes:**
 > 1. Do NOT commit `.venv` or `chroma_hybrid_db/` to GitHub — both live under `~/.deep-memory` (outside any repo) and must be generated locally using the steps above.
-> 2. Whenever `knowledge-base/` or `experience/` Markdown content is updated, re-run Step 4 to rebuild the vector index.
+> 2. Step 3 is only needed once, to create the index. After that `search.py` tops it up automatically before every query — see Index Maintenance below.
+
+---
+
+## 🔄 Index Maintenance
+
+`search.py` tops up the index before every query, so **`update_db.py` is no longer part of the daily loop**. An indexing failure prints a warning and never blocks the search; `--no-auto-index` disables the behaviour.
+
+Run `update_db.py` explicitly only to index new entries immediately rather than at the next search — e.g. right after a refinement pass. `update_db.py --rebuild` forces every entry to be re-embedded (~6 minutes for a 1,265-entry store); it is only for making vectors correspond exactly to the latest text format, never required for normal operation.
+
+### Content-addressed IDs
+
+Cold-store entries are keyed by a semantic hash — `cold-notes#<hash12>` — not by line number. The hash covers `topic` / `content` / `tags` / `skill` / `memory_type` and deliberately excludes `date` / `time` / `project` / `quality` and every template string. So:
+
+- Deleting or inserting a line anywhere in `raw.jsonl` does **not** re-embed the entries after it. Measured on a 928-line store: removing the middle line re-embedded **0** entries — the 463 entries after it only had their `line` metadata refreshed, at zero embedding cost.
+- Marking an entry `quality: reviewed` during refinement does **not** trigger a re-embed.
+- Changing how the indexed text is assembled does **not** invalidate the store.
+
+The line number survives in metadata as `line` and is returned with every cold-store hit, so results stay traceable to their source line.
+
+### Run log
+
+Each indexing run appends one JSON line to `~/.deep-memory/logs/index-runs.jsonl` with per-stage timings and why entries were re-embedded:
+
+| Reason | Meaning |
+|---|---|
+| `new` | Genuinely a new entry — normal |
+| `text-changed` | The entry's content actually changed |
+| `id-missing` | An old ID vanished as a new one appeared — the signature of an ID shift or a version mismatch |
+
+A run that re-embeds more than 20% of the store prints a warning with the reason breakdown. When the reason is `id-missing`, the usual cause is that the repo copy and the `~/.claude/skills` installed copy of `kb_reader.py` are on different versions — they assemble the indexed text differently, so each sees the other's entries as changed.
 
 ---
 

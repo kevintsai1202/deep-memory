@@ -167,14 +167,13 @@ Skip only if the turn had nothing to record (a bare acknowledgment, no other con
 5. **Write the record** after user confirmation, following these rules:
    - **Cross-skill experience**: If a non-deep-memory skill was used and is absent from (or has new techniques in) the experience store → write to `experience/skill-[skill-id].md`, update `experience/_index.json`
    - **General knowledge**: If it is a reusable workflow/preference/solution → write to `knowledge-base/[category].md`, update `knowledge-base/_index.json`
-6. **Remind user to sync**: After writing, prompt the user to run these two steps:
+6. **Remind user to back up**: After writing, prompt the user to run:
    ```bash
-   # ① Rebuild the local vector index (so RAG can find the new record)
-   <PY> skills/chroma-hybrid-search/scripts/update_db.py
-
-   # ② Back up to GitHub (preserve a portable JSONL snapshot; --repo defaults to deep-memory-knowledge)
-   <PY> skills/memory-backup/scripts/backup.py
+   # Back up to GitHub (preserve a portable JSONL snapshot; --repo defaults to deep-memory-knowledge)
+   <PY> skills/memory-backup/scripts/backup.py --workspace "$HOME/.deep-memory"
    ```
+
+   The vector index no longer needs a manual rebuild — `search.py` tops it up before every query. Run `update_db.py` explicitly only when you want the new entries indexed immediately rather than at the next search.
 
 If a non-deep-memory skill was used this turn and is not in `experience/_index.json`, proactively ask at task end whether to record the experience, naming the specific skill, e.g.:
 > "We used remotion-best-practices this session, but there's no record in the experience store. Shall I record our approach?"
@@ -264,15 +263,14 @@ python skills/deep-memory/scripts/refine_experience.py --apply
 # Limit to a specific skill
 python skills/deep-memory/scripts/refine_experience.py --skill agent-browser-cli --apply
 
-# Rebuild searchable index and spot-check
-<PY> skills/chroma-hybrid-search/scripts/update_db.py
+# Spot-check the promoted entries (search.py indexes them automatically first)
 <PY> skills/chroma-hybrid-search/scripts/search.py --query "keywords from promoted experience" --memory-type experience --limit 3 --min-score 0.35
 ```
 
 Rules:
 - Always run the dry-run first when the user asks for refinement broadly.
 - `--apply` writes deterministic `## 🔧` entries. It does not invent new conclusions; it preserves the cold note content as traceable lessons and cites `cold-notes/raw.jsonl#L...`.
-- After `--apply`, run `update_db.py` and one `search.py --memory-type experience` spot-check before reporting success.
+- After `--apply`, run one `search.py --memory-type experience` spot-check before reporting success — it indexes the newly promoted entries automatically, no separate `update_db.py` step needed.
 - If the user only asks whether refinement is needed, do not apply; report the dry-run plan.
 
 ---
@@ -295,4 +293,4 @@ The `chroma-hybrid-search` sub-skill provides local semantic hybrid search and i
 <PY> skills/chroma-hybrid-search/scripts/search.py --query "your question" --limit 3 --min-score 0.35
 ```
 
-Vector index build/rebuild rules live in `resources/cold-store-and-vectorization.md` — read it when deciding whether `update_db.py` needs to run.
+`search.py` tops up the index before each query, so `update_db.py` is not part of the normal loop. Index maintenance details — content-addressed IDs, the `logs/index-runs.jsonl` run log, and the cases where a manual run is still worth it — live in `resources/cold-store-and-vectorization.md`.

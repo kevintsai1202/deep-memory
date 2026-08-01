@@ -595,7 +595,9 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
 
 **Interfaces:**
 - Consumes: Task 2 的 `SCHEMA_VERSION`、`LEGACY_COLD_PREFIX`、`build_metadata`
-- Produces: `migrate_to_v2(client, collection, db_path, cold_docs) -> collection`
+- Produces: `migrate_to_v2(collection, db_path, cold_docs) -> collection`
+
+> 簽章刻意不收 `client`：遷移全程都在同一個 collection 上原地換 ID，不像既有的 `migrate_legacy_collection()` 需要建立新 collection 再改名。多收一個用不到的參數只會誤導呼叫端以為會換 collection。
 
 - [ ] **Step 1: 寫失敗測試**
 
@@ -609,15 +611,29 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
         self.assertEqual(docs[0]["line"], 1)
 ```
 
-在 `test_indexer.py` 追加遷移測試類別：
+在 `test_indexer.py` 的 import 區（檔案頂部）補上三個標準庫模組：
+
+```python
+import os
+import tempfile
+from pathlib import Path
+```
+
+再於檔案末尾追加兩個測試類別：
 
 ```python
 class TestMigrateToV2(unittest.TestCase):
     """遷移必須零重算：只換 ID 與補 metadata，向量原封搬移"""
 
     def _legacy_collection(self):
-        client = chromadb.EphemeralClient()
-        col = client.create_collection("legacy")
+        """建立一個含行號式 ID 的舊格式 collection。
+
+        必須沿用 make_collection 的 delete-then-create 隔離手法：chromadb 1.5.9 的
+        EphemeralClient 落在 key 寫死為 "ephemeral" 的 class-level 快取
+        （chromadb/api/shared_system_client.py:65-67），同一 process 內每次呼叫拿到的
+        是同一個 in-memory system——不先清掉同名 collection，第二個測試就會撞名失敗。
+        """
+        col = make_collection("legacy")
         col.upsert(
             ids=["cold-notes/raw.jsonl#L1", "cold-notes/raw.jsonl#L2", "kb.md#slug"],
             embeddings=[[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
@@ -626,40 +642,84 @@ class TestMigrateToV2(unittest.TestCase):
                        {"path": "cold-notes/raw.jsonl#L2", "source": "cold"},
                        {"path": "kb.md#slug", "source": "hot"}],
         )
-        return client, col
+        return col
 
     def _cold_docs(self):
         return [doc("cold-notes#111111111111", "冷一", "111111111111", line=1),
                 doc("cold-notes#222222222222", "冷二", "222222222222", line=2)]
 
     def test_ids_are_replaced_and_count_preserved(self):
-        client, col = self._legacy_collection()
-        col = indexer.migrate_to_v2(client, col, None, self._cold_docs())
+        col = indexer.migrate_to_v2(self._legacy_collection(), None, self._cold_docs())
         self.assertEqual(col.count(), 3)
         ids = set(col.get(include=[])["ids"])
         self.assertEqual(ids, {"cold-notes#111111111111", "cold-notes#222222222222", "kb.md#slug"})
 
     def test_embeddings_are_preserved_bit_for_bit(self):
-        client, col = self._legacy_collection()
-        col = indexer.migrate_to_v2(client, col, None, self._cold_docs())
+        col = indexer.migrate_to_v2(self._legacy_collection(), None, self._cold_docs())
         got = col.get(ids=["cold-notes#111111111111"], include=["embeddings"])
         self.assertAlmostEqual(float(got["embeddings"][0][0]), 0.1, places=6)
         self.assertAlmostEqual(float(got["embeddings"][0][1]), 0.2, places=6)
 
     def test_line_number_kept_in_metadata(self):
-        client, col = self._legacy_collection()
-        col = indexer.migrate_to_v2(client, col, None, self._cold_docs())
+        col = indexer.migrate_to_v2(self._legacy_collection(), None, self._cold_docs())
         meta = col.get(ids=["cold-notes#222222222222"], include=["metadatas"])["metadatas"][0]
         self.assertEqual(meta["line"], 2)
         self.assertEqual(meta["schema_version"], indexer.SCHEMA_VERSION)
 
     def test_migration_is_idempotent(self):
         # 中途失敗後重跑不得損壞資料：第二次執行應為無操作
-        client, col = self._legacy_collection()
-        col = indexer.migrate_to_v2(client, col, None, self._cold_docs())
-        col = indexer.migrate_to_v2(client, col, None, self._cold_docs())
+        col = indexer.migrate_to_v2(self._legacy_collection(), None, self._cold_docs())
+        col = indexer.migrate_to_v2(col, None, self._cold_docs())
         self.assertEqual(col.count(), 3)
-        self.assertEqual(indexer.detect_schema(col), indexer.SCHEMA_VERSION)
+        # 驗證的是「不再有行號式 ID」，而不是「整庫已達 SCHEMA_VERSION」——
+        # migrate_to_v2 的職責只到冷庫 ID 換址為止，熱庫條目的 schema_version
+        # 是後續 build_plan 走 metadata-only 路徑（零 embedding 成本）補上的。
+        # 用 detect_schema 斷言會誤把「遷移未完成整個 sync 流程」判成遷移失敗。
+        remaining = [i for i in col.get(include=[])["ids"]
+                     if i.startswith(indexer.LEGACY_COLD_PREFIX)]
+        self.assertEqual(remaining, [])
+
+    def test_entries_with_deleted_source_are_dropped(self):
+        # 來源已被刪除的舊條目沒有對應的新 doc：不搬移，其舊 ID 一併清除不留孤兒。
+        # 留著未配對的舊 ID 會讓 detect_schema 永遠停在舊版本，導致每次 sync 都重跑遷移。
+        col = indexer.migrate_to_v2(self._legacy_collection(), None,
+                                    [doc("cold-notes#111111111111", "冷一", "111111111111", line=1)])
+        ids = set(col.get(include=[])["ids"])
+        self.assertIn("cold-notes#111111111111", ids)
+        self.assertNotIn("cold-notes/raw.jsonl#L2", ids)
+
+    def test_zero_match_aborts_without_deleting(self):
+        # 冷庫 text 組裝格式若變動會導致文字比對全部落空。此時必須明確中止，
+        # 且一筆 legacy ID 都不能刪——不可倚賴 chromadb 對空 ids 的參數驗證來擋。
+        col = self._legacy_collection()
+        with self.assertRaises(RuntimeError):
+            indexer.migrate_to_v2(col, None,
+                                  [doc("cold-notes#999999999999", "完全不同的文字", "999999999999", line=1)])
+        ids = set(col.get(include=[])["ids"])
+        self.assertIn("cold-notes/raw.jsonl#L1", ids)
+        self.assertIn("cold-notes/raw.jsonl#L2", ids)
+
+
+class TestBackupDb(unittest.TestCase):
+    """備份是保護不可重建資料的唯一防線，不能等到對正式庫執行時才第一次跑起來"""
+
+    def test_copies_real_directory(self):
+        src = Path(tempfile.mkdtemp()) / "db"
+        src.mkdir()
+        (src / "chroma.sqlite3").write_text("data", encoding="utf-8")
+        dest = indexer._backup_db(str(src))
+        self.assertTrue(os.path.isdir(dest))
+        self.assertEqual((Path(dest) / "chroma.sqlite3").read_text(encoding="utf-8"), "data")
+
+    def test_none_path_skips_silently(self):
+        # 記憶體測試的正常路徑
+        self.assertIsNone(indexer._backup_db(None))
+
+    def test_non_directory_path_raises(self):
+        # 打錯或尚未建立的路徑必須立即中止，不可被當成「記憶體測試」而靜默略過——
+        # 否則安全網會在唯一真正重要的那次執行上無聲消失
+        with self.assertRaises(RuntimeError):
+            indexer._backup_db(str(Path(tempfile.mkdtemp()) / "does-not-exist"))
 ```
 
 - [ ] **Step 2: 執行測試確認失敗**
@@ -699,10 +759,16 @@ def _backup_db(db_path):
     """遷移前完整複製資料庫目錄，讓任何中斷都能原樣還原。
 
     27 MB 規模下實測約 0.06 秒，這個保險非常便宜。
-    db_path 為 None 時（記憶體測試）跳過。
+
+    刻意區分兩種「沒有備份」：db_path 為 None 是記憶體測試，正常略過；
+    傳了路徑卻不是目錄，則是呼叫端出了錯（打錯字、目錄尚未建立），必須立即中止。
+    把兩者混為一談，會讓一個打錯的路徑在唯一真正重要的那次執行上無聲地移除整張安全網。
     """
-    if not db_path or not os.path.isdir(db_path):
+    if db_path is None:
         return None
+    if not os.path.isdir(db_path):
+        raise RuntimeError(
+            f"[遷移] 指定的向量庫路徑不是目錄，無法建立備份，已中止：{db_path!r}")
     import shutil
     from datetime import datetime
     dest = f"{db_path}.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
@@ -710,7 +776,7 @@ def _backup_db(db_path):
     return dest
 
 
-def migrate_to_v2(client, collection, db_path, cold_docs):
+def migrate_to_v2(collection, db_path, cold_docs):
     """把行號定址的冷庫 ID 換成內容定址，並回填 content_hash 與 schema_version。
 
     關鍵性質是零重算：embedding 只跟文字有關、跟 ID 無關，既有向量原封搬到
@@ -731,17 +797,27 @@ def migrate_to_v2(client, collection, db_path, cold_docs):
     data = collection.get(ids=legacy_ids, include=["embeddings", "documents", "metadatas"])
     by_text = {d["text"]: d for d in cold_docs}
 
-    new_ids, embs, docs_out, metas, migrated_old = [], [], [], [], []
-    for i, old_id in enumerate(data["ids"]):
+    new_ids, embs, docs_out, metas = [], [], [], []
+    for i in range(len(data["ids"])):
         target = by_text.get(data["documents"][i])
         if target is None:
-            # 來源已刪除的條目：不搬移，留給後續的孤立向量清理處理
+            # 來源已刪除的條目：不搬移，其舊 ID 會在下方連同其他 legacy ID 一併刪除。
+            # 不保留未配對的舊 ID 是刻意的——留著會讓 detect_schema 永遠停在舊版本，
+            # 導致每次 sync 都重新備份並重跑一次遷移。
             continue
         new_ids.append(target["path"])
         embs.append(data["embeddings"][i])
         docs_out.append(target["text"])
         metas.append(build_metadata(target))
-        migrated_old.append(old_id)
+
+    # 明確的前置守衛：沒有任何條目配對成功，代表冷庫 text 的組裝格式已經變動，
+    # 不是「剛好沒東西要搬」。這時若繼續往下走會刪光所有 legacy ID 卻一筆都沒遷移。
+    # 不倚賴 chromadb 對空 ids 的參數驗證來擋——那是別人的實作細節，且訊息無法診斷。
+    if legacy_ids and not new_ids:
+        raise RuntimeError(
+            f"[遷移] {len(legacy_ids)} 筆 legacy 條目沒有任何一筆配對成功，已中止且未刪除任何資料。"
+            f"最可能的原因是 kb_reader 組裝冷庫 text 的格式已變動，導致文字比對全部落空。"
+            f"如需還原請使用備份 {backup}")
 
     for s in range(0, len(new_ids), 500):
         collection.upsert(ids=new_ids[s:s+500], embeddings=embs[s:s+500],
@@ -767,7 +843,7 @@ def migrate_to_v2(client, collection, db_path, cold_docs):
 & "$HOME\.deep-memory\.venv\Scripts\python" -m unittest discover -s "d:\GitHub\deep-memory\skills\chroma-hybrid-search\scripts" -p "test_*.py" -v
 ```
 
-預期：`Ran 27 tests` 且 `OK`（test_kb_reader 10 + test_indexer 17）
+預期：`Ran 32 tests` 且 `OK`（test_kb_reader 10 + test_indexer 22）
 
 - [ ] **Step 6: 提交**
 
@@ -801,12 +877,10 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
 
 - [ ] **Step 1: 寫失敗測試**
 
-先在 `test_indexer.py` 的 import 區（檔案頂部）補上三個標準庫模組：
+先在 `test_indexer.py` 的 import 區（檔案頂部）補上 `json`（`tempfile` 與 `Path` 已於 Task 3 加入）：
 
 ```python
 import json
-import tempfile
-from pathlib import Path
 ```
 
 再於檔案末尾追加兩個測試類別：
@@ -870,20 +944,30 @@ ANOMALY_RATIO = 0.2
 
 
 def write_run_log(base_dir, record):
-    """把一次索引執行追加為一行 JSON 到 logs/index-runs.jsonl。
+    """把一次索引執行追加為一行 JSON 到 logs/index-runs.jsonl，回傳日誌檔路徑。
 
     採 JSONL 而非人類可讀格式，是為了讓「這半年索引變慢過幾次、各是什麼原因」
     能直接用程式彙總。單行約 300 bytes，每日十次執行一年約 1 MB，不需輪替。
+
+    寫檔失敗只印警告後回傳 None，不往上拋。sync() 是在 embedding 已經寫入之後
+    才呼叫這裡，若讓一次暫時性的檔案鎖（Windows 上防毒或雲端同步佔用檔案是現實情境）
+    把一個已完成的索引變成例外，使用者會透過 ensure_fresh 的 catch-all 看到
+    「自動補索引失敗」，而索引其實好好的。觀測工具的失敗不該破壞它要觀測的東西——
+    與 ensure_fresh 是同一條原則。只吞 OSError 一族，程式邏輯的錯誤仍要暴露出來。
     """
-    log_dir = os.path.join(str(base_dir), "logs")
-    os.makedirs(log_dir, exist_ok=True)
-    path = os.path.join(log_dir, "index-runs.jsonl")
     payload = {"ts": datetime.now().isoformat(timespec="seconds"),
                "schema_version": SCHEMA_VERSION}
     payload.update(record)
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    return path
+    try:
+        log_dir = os.path.join(str(base_dir), "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        path = os.path.join(log_dir, "index-runs.jsonl")
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        return path
+    except OSError as exc:
+        print(f"[WARN] 索引執行日誌寫入失敗（索引本身已完成，不受影響）：{exc}")
+        return None
 
 
 def format_anomaly_warning(plan, total):
@@ -917,7 +1001,7 @@ def format_anomaly_warning(plan, total):
 & "$HOME\.deep-memory\.venv\Scripts\python" -m unittest discover -s "d:\GitHub\deep-memory\skills\chroma-hybrid-search\scripts" -p "test_indexer.py" -v
 ```
 
-預期：`Ran 22 tests` 且 `OK`
+預期：`Ran 27 tests` 且 `OK`
 
 - [ ] **Step 5: 提交**
 
@@ -1059,9 +1143,14 @@ def sync(base_dir, trigger="update_db", rebuild=False, verbose=True):
     collection = client.get_or_create_collection("hybrid_docs")
     assert_schema_supported(collection)
 
+    # 遷移只負責把冷庫的行號 ID 換成內容定址；熱庫條目缺少的 schema_version
+    # 是下面 build_plan 比對出 metadata 不同後，走 collection.update() 補上的
+    # （零 embedding 成本）。因此第一次 sync 時 detect_schema 仍會回報舊版本，
+    # migrate_to_v2 會被呼叫但立即因「已無行號式 ID」而 return——這是預期行為，
+    # 不是重複遷移。第二次 sync 起 detect_schema 才會回報 SCHEMA_VERSION。
     if detect_schema(collection) < SCHEMA_VERSION:
         t = time.time()
-        collection = migrate_to_v2(client, collection, db_path, cold_docs)
+        collection = migrate_to_v2(collection, db_path, cold_docs)
         timing["migrate"] = round(time.time() - t, 2)
 
     t = time.time()
@@ -1190,7 +1279,7 @@ if __name__ == "__main__":
 & "$HOME\.deep-memory\.venv\Scripts\python" -m unittest discover -s "d:\GitHub\deep-memory\skills\chroma-hybrid-search\scripts" -p "test_*.py" -v
 ```
 
-預期：`Ran 36 tests` 且 `OK`（test_kb_reader 10 + test_indexer 26）
+預期：`Ran 41 tests` 且 `OK`（test_kb_reader 10 + test_indexer 31）
 
 接著實跑一次真實遷移（**這會修改正式庫，但 `migrate_to_v2` 會先自動備份**）：
 
@@ -1266,15 +1355,52 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
         indexer.ensure_fresh(base_dir)
 ```
 
-- [ ] **Step 3: 確認既有測試未被破壞**
+- [ ] **Step 3: 讓檢索結果帶出冷庫行號**
+
+內容定址後冷庫的 `path` 只剩雜湊（`cold-notes#a3f19c2b`），人看不出來源在哪一行。`line` 已存在 metadata 與 `doc_map` 中，但目前**沒有任何消費者**——若不接出來，spec 所說「行號降級為 metadata，供人閱讀的來源引用照常產出」就沒有實現。
+
+在組裝結果的兩處之前加入共用的組裝函式（避免兩處各寫一份而發散）：
+
+```python
+def _make_hit(doc, **extra):
+    """組裝單筆檢索結果。
+
+    冷庫條目附上行號，讓人能從檢索結果直接跳回 raw.jsonl 的來源行——
+    內容定址後 path 只剩雜湊，少了這個欄位就失去可追溯性。
+    熱庫條目沒有 line，欄位整個省略而非填 None。
+    """
+    hit = {"path": doc["path"], "text": doc["text"], **extra}
+    if doc.get("line") is not None:
+        hit["line"] = doc["line"]
+    return hit
+```
+
+把 rerank 分支（約 107-112 行）改為：
+
+```python
+            for path, score in scored_candidates[:args.limit]:
+                retrieved_docs.append(_make_hit(doc_map[path], rerank_score=score))
+```
+
+把非 rerank 分支（約 114-120 行）改為：
+
+```python
+        for path in candidates[:args.limit]:
+            if path in doc_map:
+                retrieved_docs.append(_make_hit(
+                    doc_map[path],
+                    score=bm25_scores.get(path, 0.0) if args.mode == "bm25" else None))
+```
+
+- [ ] **Step 4: 確認既有測試未被破壞**
 
 ```powershell
 & "$HOME\.deep-memory\.venv\Scripts\python" -m unittest discover -s "d:\GitHub\deep-memory\skills\chroma-hybrid-search\scripts" -p "test_*.py" -v
 ```
 
-預期：`Ran 36 tests` 且 `OK`（`ensure_fresh` 的 fail-safe 行為已於 Task 5 測過）
+預期：`Ran 41 tests` 且 `OK`（`ensure_fresh` 的 fail-safe 行為已於 Task 5 測過）
 
-- [ ] **Step 4: 實跑驗證自動補索引生效**
+- [ ] **Step 5: 實跑驗證自動補索引生效**
 
 先寫一筆新的冷庫條目，**不手動跑 update_db.py**，直接搜尋它：
 
@@ -1284,17 +1410,17 @@ $env:PYTHONIOENCODING='utf-8'
 & "$HOME\.deep-memory\.venv\Scripts\python" "d:\GitHub\deep-memory\skills\chroma-hybrid-search\scripts\search.py" --query "zzz-autoindex-probe" --limit 3 --min-score 0.35
 ```
 
-預期：搜尋結果**包含**剛寫入的條目（證明未手動索引也能撈到）。
+預期兩件事：搜尋結果**包含**剛寫入的條目（證明未手動索引也能撈到），且該筆結果帶有 `"line"` 欄位（Step 3 的行號回傳生效）。
 
-再驗證 fail-safe——用一個不存在的 workspace 觸發索引失敗，搜尋不得整個掛掉：
+再驗證 `--no-auto-index` 路徑仍可用：
 
 ```powershell
 & "$HOME\.deep-memory\.venv\Scripts\python" "d:\GitHub\deep-memory\skills\chroma-hybrid-search\scripts\search.py" --query "zzz-autoindex-probe" --limit 3 --min-score 0.35 --no-auto-index
 ```
 
-預期：正常回傳結果（`--no-auto-index` 路徑可用）。
+預期：正常回傳結果。
 
-- [ ] **Step 5: 清除驗證用的臨時條目**
+- [ ] **Step 6: 清除驗證用的臨時條目**
 
 ```powershell
 & "$HOME\.deep-memory\.venv\Scripts\python" -c @'
@@ -1309,7 +1435,7 @@ print(f"剩餘 {len(lines)} 行")
 
 **這一步同時是驗收標準 3 的實測**：刪掉冷庫中間一行後，預期輸出為「重算 0 筆」且「移除 1 筆孤立向量」。若出現數百筆重算，代表內容定址沒有生效，必須回頭檢查。
 
-- [ ] **Step 6: 提交**
+- [ ] **Step 7: 提交**
 
 ```powershell
 & git -C "d:\GitHub\deep-memory" add skills/chroma-hybrid-search/scripts/search.py
