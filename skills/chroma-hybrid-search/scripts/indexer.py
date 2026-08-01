@@ -16,6 +16,11 @@ SCHEMA_VERSION = 2
 # 舊版冷庫 ID 前綴（行號定址）。存在此前綴即代表該庫尚未遷移。
 LEGACY_COLD_PREFIX = "cold-notes/raw.jsonl#L"
 
+# 冷庫 ID 的共同前綴，同時涵蓋舊版行號式（cold-notes/raw.jsonl#L{n}）與
+# 新版內容定址（cold-notes#<hash>）兩種形式。用來判斷「這是冷庫條目」，
+# 例如 backfill_hot_entries 得知道哪些 ID 不能碰。
+COLD_ID_PREFIX = "cold-notes"
+
 
 def detect_schema(collection):
     """判斷向量庫的 schema 版本，決定要不要遷移。
@@ -32,6 +37,21 @@ def detect_schema(collection):
     metas = collection.get(include=["metadatas"])["metadatas"]
     versions = {(m or {}).get("schema_version", 1) for m in metas}
     return min(versions) if versions else SCHEMA_VERSION
+
+
+def assert_schema_supported(collection):
+    """庫的 schema 版本高於本腳本時中止執行。
+
+    舊腳本寫進新格式的庫會產生無法自動修復的混合狀態——
+    寧可明確擋下並要求升級 skill，也不要留下一個壞掉的索引。
+    """
+    metas = collection.get(include=["metadatas"])["metadatas"]
+    versions = {(m or {}).get("schema_version", 1) for m in metas}
+    if versions and max(versions) > SCHEMA_VERSION:
+        raise RuntimeError(
+            f"向量庫 schema 版本為 {max(versions)}，高於本腳本的 {SCHEMA_VERSION}。"
+            f"請先升級 chroma-hybrid-search 技能（repo 與 ~/.claude/skills 兩處都要），"
+            f"再重新執行。")
 
 
 def build_metadata(doc):
@@ -185,6 +205,60 @@ def migrate_to_v2(collection, db_path, cold_docs):
     return collection
 
 
+def backfill_hot_entries(collection):
+    """為 v1 熱庫條目回填 content_hash 與 schema_version（零 embedding 成本）。
+
+    起因（2026-08-01 對正式庫遷移時的真實事故）：v1 庫的熱庫 metadata
+    只有 memory_type / path / source 三個欄位，沒有 content_hash。
+    build_plan 比對新舊 metadata 時，
+    `(old or {}).get("content_hash") != doc["content_hash"]` 這一行
+    寫在「metadata 不同才走 collection.update()」的分支*之前*執行，
+    `None != "<hash>"` 恆為真，於是全部落入 text-changed 分支、
+    當成文字被改過重新計算 embedding。那次遷移因此把 337 筆一字未改
+    的熱庫條目（庫內既有筆數的 27%）都重算了一次，多花 126 秒，
+    還誤觸了 20% 的異常重算警告，讓使用者以為索引出了問題——
+    其實只是遷移路徑少做了這一步回填。
+
+    這個函式就是補上那一步：直接對 collection 做 collection.update()，
+    把缺少的 content_hash 與 schema_version 疊加回原有 metadata。
+    之後 build_plan 再比對同一批熱庫條目時，old.get("content_hash")
+    已經等於新雜湊，走的是完全跳過，不會誤判成文字變動。
+
+    只處理熱庫條目（ID 不以 COLD_ID_PREFIX 開頭）：熱庫的 content_hash
+    是 hot_entry_hash(entry 全文)，而 collection 存的 document 本身
+    就是這段全文，兩者需要的資料都在庫內，可以現場反推。冷庫的
+    content_hash 則是 semantic_hash(entry)，由 raw.jsonl 的
+    topic/content/tags/skill/memory_type 等「原始」欄位算出；collection
+    裡的 document 只是組裝給人看的顯示文字，缺了原始欄位反推不出正確
+    雜湊。冷庫條目的 content_hash 只能靠 migrate_to_v2 換址時透過
+    build_metadata 補上，不屬於本函式的職責，誤觸只會寫入錯的雜湊，
+    讓冷庫條目永遠比對不上而每次都被當成 text-changed。
+    """
+    from kb_reader import hot_entry_hash
+
+    data = collection.get(include=["documents", "metadatas"])
+    fix_ids, fix_metas = [], []
+    for doc_id, text, meta in zip(data["ids"], data["documents"], data["metadatas"]):
+        if doc_id.startswith(COLD_ID_PREFIX):
+            continue
+        meta = meta or {}
+        if meta.get("content_hash"):
+            continue  # 已有 content_hash：不是 v1 遺留條目，不需回填
+        # 保留原有欄位、只疊加缺少的兩個 key——不論 collection.update()
+        # 對 metadata 是整筆覆蓋還是逐欄合併，這樣寫都不會弄丟既有欄位
+        # （例如 memory_type、skill、tags、project）。
+        new_meta = dict(meta)
+        new_meta["content_hash"] = hot_entry_hash(text)
+        new_meta["schema_version"] = SCHEMA_VERSION
+        fix_ids.append(doc_id)
+        fix_metas.append(new_meta)
+
+    if fix_ids:
+        collection.update(ids=fix_ids, metadatas=fix_metas)
+        print(f"[遷移] 回填 {len(fix_ids)} 筆熱庫條目的 content_hash，未重算任何向量")
+    return len(fix_ids)
+
+
 def build_plan(collection, docs):
     """比對來源文件與向量庫現況，產出增量計畫。
 
@@ -283,3 +357,128 @@ def format_anomaly_warning(plan, total):
         lines.append("  請先確認兩處的 kb_reader.py 一致再重跑。")
     lines.append(f"  樣本：{', '.join(plan.embed_ids[:3])}")
     return "\n".join(lines)
+
+
+def sync(base_dir, trigger="update_db", rebuild=False, verbose=True):
+    """執行一次完整的索引同步，回傳統計結果。
+
+    trigger 記錄呼叫來源（update_db / search-auto），寫進日誌以便區分
+    「使用者手動跑」與「搜尋時自動補」兩種情境的耗時分佈。
+    rebuild=True 時強制重算全部條目（遷移後想讓向量與新文字格式完全對應時使用）。
+    """
+    import time
+    import chromadb
+    from kb_reader import read_knowledge_base, read_cold_notes
+
+    timing = {}
+    t0 = time.time()
+
+    base_dir = os.path.abspath(str(base_dir))
+    db_path = os.path.join(base_dir, "chroma_hybrid_db")
+
+    t = time.time()
+    hot_docs = read_knowledge_base(base_dir)
+    cold_docs = read_cold_notes(base_dir)
+    docs = hot_docs + cold_docs
+    timing["read"] = round(time.time() - t, 2)
+
+    client = chromadb.PersistentClient(path=db_path)
+    collection = client.get_or_create_collection("hybrid_docs")
+    assert_schema_supported(collection)
+
+    # 這個 if 底下做兩件事：migrate_to_v2 把冷庫的行號式 ID 換成內容定址；
+    # backfill_hot_entries 用 collection.update() 補上熱庫條目缺少的
+    # content_hash 與 schema_version（零 embedding 成本）。後者不是可有
+    # 可無的收尾，而是必要的一步：v1 庫的熱庫 metadata 只有
+    # memory_type / path / source，沒有 content_hash。build_plan 比對時
+    # `(old or {}).get("content_hash") != doc["content_hash"]` 這一行
+    # 先於「metadata 不同才 update」的分支執行，`None != "<hash>"` 恆為
+    # 真——若不先補上 content_hash，所有熱庫條目都會被誤判為
+    # text-changed 而重新計算 embedding。2026-08-01 對正式庫遷移時就是
+    # 這樣：一字未改的 337 筆熱庫條目被重算，多花 126 秒，還誤觸了 20%
+    # （337/1247≈27%）的異常重算警告，讓使用者誤以為出了問題。
+    #
+    # migrate_to_v2 在「已無行號式冷庫 ID」時會提早 return（可能是冷庫
+    # 已遷移過、只剩熱庫尚未回填 content_hash 的部分遷移狀態），所以
+    # backfill_hot_entries 不能掛在它內部，必須留在這個 if 區塊裡與它
+    # 平行呼叫，兩者才會各自在需要時都執行到。等所有條目的
+    # schema_version 皆為 SCHEMA_VERSION 後，detect_schema 才會回報
+    # 最新版本，本區塊屆時就不會再被進入。
+    if detect_schema(collection) < SCHEMA_VERSION:
+        t = time.time()
+        collection = migrate_to_v2(collection, db_path, cold_docs)
+        backfill_hot_entries(collection)
+        timing["migrate"] = round(time.time() - t, 2)
+
+    t = time.time()
+    plan = build_plan(collection, docs)
+    timing["get"] = round(time.time() - t, 2)
+
+    total_existing = len(collection.get(include=[])["ids"])
+
+    if rebuild:
+        # 強制全量：把所有條目都放進待重算清單
+        plan.embed_ids = [d["path"] for d in docs]
+        plan.embed_docs = [d["text"] for d in docs]
+        plan.embed_metas = [build_metadata(d) for d in docs]
+        plan.meta_ids, plan.meta_metas = [], []
+        plan.skipped = 0
+
+    warning = None if rebuild else format_anomaly_warning(plan, total_existing)
+    if warning and verbose:
+        print(warning)
+
+    if plan.stale_ids:
+        collection.delete(ids=plan.stale_ids)
+        if verbose:
+            print(f"[清理] 移除 {len(plan.stale_ids)} 筆孤立向量（來源已刪除或改名）")
+
+    timing["model_load"] = 0.0
+    timing["embed"] = 0.0
+    if plan.embed_ids:
+        # 到這裡才載入模型：零變動或 metadata-only 的執行完全不付模型載入成本
+        t = time.time()
+        from onnx_models import E5OnnxEmbeddingFunction
+        ef = E5OnnxEmbeddingFunction()
+        timing["model_load"] = round(time.time() - t, 2)
+
+        t = time.time()
+        embeddings = ef(plan.embed_docs)
+        timing["embed"] = round(time.time() - t, 2)
+
+        collection.upsert(ids=plan.embed_ids, embeddings=embeddings,
+                          documents=plan.embed_docs, metadatas=plan.embed_metas)
+    if plan.meta_ids:
+        collection.update(ids=plan.meta_ids, metadatas=plan.meta_metas)
+
+    timing["total"] = round(time.time() - t0, 2)
+    result = {
+        "trigger": trigger,
+        "total": len(docs),
+        "embedded": len(plan.embed_ids),
+        "meta_only": len(plan.meta_ids),
+        "skipped": plan.skipped,
+        "stale": len(plan.stale_ids),
+        "reasons": plan.reasons,
+        "timing": timing,
+    }
+    write_run_log(base_dir, result)
+
+    if verbose:
+        print(f"[增量] 重算 {result['embedded']} 筆、僅更新 metadata "
+              f"{result['meta_only']} 筆、未變跳過 {result['skipped']} 筆"
+              f"（耗時 {timing['total']}s）")
+    return result
+
+
+def ensure_fresh(base_dir, verbose=False):
+    """供 search.py 於查詢前呼叫的自動補索引。
+
+    索引是為了服務檢索，不該反過來讓檢索失效——任何失敗都只印警告後放行，
+    使用者最多少撈到最新幾筆，而不是整個搜尋不能用。
+    """
+    try:
+        return sync(base_dir, trigger="search-auto", verbose=verbose)
+    except Exception as exc:
+        print(f"[WARN] 自動補索引失敗，改用現有索引繼續查詢：{exc}")
+        return None

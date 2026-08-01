@@ -1,14 +1,18 @@
 # -*- coding: utf-8 -*-
 """indexer 的 schema 偵測與增量比對測試（需 venv，會用到 chromadb 記憶體模式）"""
+import contextlib
+import io
 import json
 import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import chromadb
 
 import indexer
+import kb_reader
 
 
 def make_collection(name="col"):
@@ -260,6 +264,73 @@ class TestMigrateToV2(unittest.TestCase):
         self.assertIn("cold-notes/raw.jsonl#L1", ids)
 
 
+class TestBackfillHotEntries(unittest.TestCase):
+    """回填熱庫 content_hash：2026-08-01 對正式庫遷移時，因為少了這一步，
+    337 筆文字完全沒變的熱庫條目被 build_plan 誤判為 text-changed 而
+    重新計算 embedding，多花 126 秒。這裡釘住修復後的行為——回填之後，
+    文字未變的 v1 熱庫條目不會再落入 embed_ids。
+    """
+
+    def test_v1_hot_entry_is_not_reembedded_after_backfill(self):
+        text = "這是一筆熱庫條目的全文，內容從未變動過。"
+        col = make_collection()
+        # v1 庫的熱庫 metadata 真實樣貌：只有 memory_type / path / source，
+        # 沒有 content_hash，也沒有 schema_version（見 backfill_hot_entries docstring）。
+        col.upsert(ids=["knowledge-base/foo.md#bar"], embeddings=[[0.1, 0.2]],
+                   documents=[text],
+                   metadatas=[{"path": "knowledge-base/foo.md#bar",
+                               "source": "hot", "memory_type": "knowledge"}])
+
+        indexer.backfill_hot_entries(col)
+
+        # 回填後應該補上 content_hash 與 schema_version，且雜湊要與
+        # kb_reader 實際使用的演算法一致（不是隨便塞一個值就通過）
+        meta = col.get(ids=["knowledge-base/foo.md#bar"], include=["metadatas"])["metadatas"][0]
+        self.assertEqual(meta["content_hash"], kb_reader.hot_entry_hash(text))
+        self.assertEqual(meta["schema_version"], indexer.SCHEMA_VERSION)
+
+        # 文字完全沒變的情況下重跑 build_plan：不該落入 embed_ids，
+        # 而應直接被判定為 skipped（既非 text-changed 也非 meta_only）
+        plan = indexer.build_plan(
+            col, [doc("knowledge-base/foo.md#bar", text, kb_reader.hot_entry_hash(text),
+                      source="hot", memory_type="knowledge")])
+        self.assertNotIn("knowledge-base/foo.md#bar", plan.embed_ids)
+        self.assertEqual(plan.reasons["text-changed"], 0)
+        self.assertEqual(plan.skipped, 1)
+
+    def test_cold_entries_are_left_untouched(self):
+        # 冷庫的 content_hash 算不出來：它來自 raw.jsonl 的原始欄位
+        # （topic/content/tags/skill/memory_type），collection 內只有
+        # 組裝後給人看的顯示文字，反推不出正確雜湊。backfill_hot_entries
+        # 必須完全跳過冷庫 ID（不論新舊形式），否則會寫入錯誤的 content_hash。
+        col = make_collection()
+        col.upsert(
+            ids=["cold-notes/raw.jsonl#L1", "cold-notes#deadbeef0001"],
+            embeddings=[[0.1, 0.2], [0.3, 0.4]],
+            documents=["冷庫組裝後的文字一", "冷庫組裝後的文字二"],
+            metadatas=[{"path": "cold-notes/raw.jsonl#L1", "source": "cold"},
+                       {"path": "cold-notes#deadbeef0001", "source": "cold"}],
+        )
+        indexer.backfill_hot_entries(col)
+        metas = col.get(ids=["cold-notes/raw.jsonl#L1", "cold-notes#deadbeef0001"],
+                        include=["metadatas"])["metadatas"]
+        for meta in metas:
+            self.assertNotIn("content_hash", meta)
+
+    def test_entry_with_existing_hash_is_left_alone(self):
+        # 已有 content_hash 的條目不是 v1 遺留條目，不該被本函式改動
+        col = make_collection()
+        col.upsert(ids=["knowledge-base/foo.md#bar"], embeddings=[[0.1, 0.2]],
+                   documents=["文字"],
+                   metadatas=[{"path": "knowledge-base/foo.md#bar", "source": "hot",
+                               "content_hash": "keepme000001",
+                               "schema_version": indexer.SCHEMA_VERSION}])
+        fixed = indexer.backfill_hot_entries(col)
+        self.assertEqual(fixed, 0)
+        meta = col.get(ids=["knowledge-base/foo.md#bar"], include=["metadatas"])["metadatas"][0]
+        self.assertEqual(meta["content_hash"], "keepme000001")
+
+
 class TestRunLog(unittest.TestCase):
     def test_appends_one_json_line_per_run(self):
         base = Path(tempfile.mkdtemp())
@@ -312,6 +383,45 @@ class TestAnomalyWarning(unittest.TestCase):
         # 首次建庫全部都是新條目，不該被當成異常
         plan = self._plan_with(100, {"new": 100, "text-changed": 0, "id-missing": 0})
         self.assertIsNone(indexer.format_anomaly_warning(plan, total=0))
+
+
+class TestSchemaGuard(unittest.TestCase):
+    def test_refuses_to_run_against_newer_schema(self):
+        # 腳本比庫舊時必須中止，不讓舊腳本把新格式的庫改壞
+        col = make_collection()
+        col.upsert(ids=["cold-notes#abc123abc123"], embeddings=[[0.1, 0.2]],
+                   documents=["a"],
+                   metadatas=[{"path": "cold-notes#abc123abc123",
+                               "content_hash": "abc123abc123",
+                               "schema_version": indexer.SCHEMA_VERSION + 1}])
+        with self.assertRaises(RuntimeError) as ctx:
+            indexer.assert_schema_supported(col)
+        self.assertIn("升級", str(ctx.exception))
+
+    def test_allows_current_and_older_schema(self):
+        col = make_collection()
+        col.upsert(ids=["cold-notes/raw.jsonl#L1"], embeddings=[[0.1, 0.2]],
+                   documents=["a"], metadatas=[{"path": "cold-notes/raw.jsonl#L1"}])
+        indexer.assert_schema_supported(col)   # 不應拋出
+
+
+class TestEnsureFreshFailSafe(unittest.TestCase):
+    """索引失敗不得阻斷檢索——檢索是讀取路徑，不該被寫入路徑的問題癱瘓"""
+
+    def test_returns_none_and_warns_when_sync_fails(self):
+        with mock.patch.object(indexer, "sync", side_effect=RuntimeError("模擬索引失敗")):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                result = indexer.ensure_fresh("/nonexistent")
+        self.assertIsNone(result)
+        self.assertIn("WARN", buf.getvalue())
+        self.assertIn("模擬索引失敗", buf.getvalue())
+
+    def test_passes_through_result_on_success(self):
+        with mock.patch.object(indexer, "sync", return_value={"embedded": 3}) as m:
+            result = indexer.ensure_fresh("/some/path")
+        self.assertEqual(result, {"embedded": 3})
+        self.assertEqual(m.call_args.kwargs["trigger"], "search-auto")
 
 
 if __name__ == "__main__":
