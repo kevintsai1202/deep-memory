@@ -35,6 +35,18 @@ def rrf(vector_ranked, bm25_ranked, k=60):
         rrf_scores[doc_id] = rrf_scores.get(doc_id, 0.0) + 1.0 / (k + (rank + 1))
     return rrf_scores
 
+def _make_hit(doc, **extra):
+    """組裝單筆檢索結果。
+
+    冷庫條目附上行號，讓人能從檢索結果直接跳回 raw.jsonl 的來源行——
+    內容定址後 path 只剩雜湊，少了這個欄位就失去可追溯性。
+    熱庫條目沒有 line，欄位整個省略而非填 None。
+    """
+    hit = {"path": doc["path"], "text": doc["text"], **extra}
+    if doc.get("line") is not None:
+        hit["line"] = doc["line"]
+    return hit
+
 def run_search(docs, collection, args, query_embedding=None, extra_where=None):
     """對給定的 docs 子集執行一次完整的 vector + BM25 + RRF + rerank 檢索，回傳 retrieved_docs 列表"""
     if not docs:
@@ -105,19 +117,13 @@ def run_search(docs, collection, args, query_embedding=None, extra_where=None):
 
             scored_candidates.sort(key=lambda x: x[1], reverse=True)
             for path, score in scored_candidates[:args.limit]:
-                retrieved_docs.append({
-                    "path": path,
-                    "rerank_score": score,
-                    "text": doc_map[path]["text"]
-                })
+                retrieved_docs.append(_make_hit(doc_map[path], rerank_score=score))
     else:
         for path in candidates[:args.limit]:
             if path in doc_map:
-                retrieved_docs.append({
-                    "path": path,
-                    "score": bm25_scores.get(path, 0.0) if args.mode == "bm25" else None,
-                    "text": doc_map[path]["text"]
-                })
+                retrieved_docs.append(_make_hit(
+                    doc_map[path],
+                    score=bm25_scores.get(path, 0.0) if args.mode == "bm25" else None))
 
     return retrieved_docs
 
@@ -144,9 +150,19 @@ def main():
                         help="Filter cold-store entries by memory_type")
     parser.add_argument("--project", type=str, default=None,
                         help="限定搜尋範圍為此專案；未指定時自動取當前工作目錄的資料夾名稱。傳 'all' 或空字串可停用專案篩選、直接搜全部")
+    parser.add_argument("--no-auto-index", action="store_true",
+                        help="停用查詢前的自動補索引（預設會先把新寫入的條目補進索引）")
     args = parser.parse_args()
 
     base_dir = os.path.abspath(args.workspace)
+
+    # 查詢前自動把新寫入的條目補進索引，使用者不必手動跑 update_db.py。
+    # 這裡的成本幾乎全被本來就要付的 import 與模型載入吸收；
+    # ensure_fresh 內部已做例外處理，失敗只會警告不會中斷查詢。
+    if not args.no_auto_index:
+        import indexer
+        indexer.ensure_fresh(base_dir)
+
     all_docs = read_knowledge_base(base_dir) + read_cold_notes(base_dir)
 
     # 套用 --skill / --tag 過濾，讓 BM25 端跟向量端（見下方 where 子句）看到一致的候選集合

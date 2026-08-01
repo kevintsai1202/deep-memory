@@ -4,7 +4,8 @@
 >
 > 對應實作位置：[skills/chroma-hybrid-search/](../skills/chroma-hybrid-search/)
 > - 檢索腳本：`scripts/search.py`
-> - 索引腳本：`scripts/update_db.py`
+> - 索引腳本：`scripts/update_db.py`（CLI 薄殼）
+> - 索引核心：`scripts/indexer.py`（schema 偵測、遷移、增量比對、寫入、執行日誌；`search.py` 的自動補索引與 `update_db.py` 共用同一套判斷）
 > - 共用讀取／切段邏輯：`scripts/kb_reader.py`
 > - 冷庫寫入：`scripts/write_cold.py`
 > - 輕量 ONNX 推論：`scripts/onnx_models.py`（設計緣由與效能數據見 [onnx-optimization.md](onnx-optimization.md)）
@@ -68,6 +69,9 @@ RAG 的檢索對象涵蓋兩層儲存，**全部集中在使用者家目錄的�
 | `skill` | `experience/skill-[id].md` 檔名，或冷庫條目的 `skill` 欄位 | `--skill` 精準過濾 |
 | `tags` | experience 條目的 `**keywords:**` 行，或冷庫條目的 `tags` 陣列 | `--tag` 過濾（Chroma 原生 `$contains`，需 chromadb ≥ 1.5.0） |
 | `project` | 冷庫條目的 `project` 欄位 | 專案優先檢索；舊條目無此欄位、刻意不補填，視為「不屬於任何專案」 |
+| `content_hash` | 冷庫 `semantic_hash(entry)`／熱庫 `hot_entry_hash(text)` | 增量比對的鍵——比它而非比完整組裝文字，使顯示格式調整不再觸發全庫重算 |
+| `schema_version` | `indexer.SCHEMA_VERSION` | 遷移偵測；庫的版本高於腳本時直接中止，避免舊腳本寫壞新格式 |
+| `line` | 冷庫條目在 `raw.jsonl` 的行號 | 內容定址後 id 只剩雜湊，靠此欄位保留來源可追溯性（熱庫條目無此欄位） |
 
 ### 3.3 Embedding 模型與寫入
 
@@ -76,16 +80,27 @@ RAG 的檢索對象涵蓋兩層儲存，**全部集中在使用者家目錄的�
 - 寫入採 `upsert`：同 id 覆寫、新 id 新增。
 - **孤立向量清理**：upsert 不會自動移除已刪除／改名來源的舊向量，因此每次重建會比對「當前應存在的 ids」與「向量庫實際 ids」，主動刪除差集。
 
-### 3.4 重建時機（節錄）
+### 3.4 重建時機
 
-`update_db.py` 為**增量索引**：只對新增或文本變動的條目重算向量，metadata-only 變動不重算，零變動的執行約 1 秒完成（此時完全不載入模型）。仍**不建議每次寫入就觸發**：
+`search.py` 在查詢前會呼叫 `indexer.ensure_fresh()` 自動補索引，因此**日常不需要手動執行 `update_db.py`**。索引失敗只印警告、不中斷查詢；`--no-auto-index` 可停用。
 
-- 熱庫有新增／修改內容 → 必須重建（否則 RAG 找不到新條目）。
-- 冷庫本回合有寫入且**即將發生 RAG 查詢** → 查詢前 lazy 重建。
-- 冷庫累積 ≥ 5 筆新條目 → 批次重建。
-- 只有排版變動、或本回合只查詢不寫入 → 不需重建。
+`update_db.py` 為**增量索引**：只對新增或內容雜湊變動的條目重算向量，metadata-only 變動走 `collection.update()` 不重算，零變動的執行約 1-2 秒完成（此時完全不載入模型）。仍值得手動執行的情況只剩兩種：
 
-> ⚠️ `write_cold.py` 只是把 JSONL 追加到冷庫（純文字備份），**寫入 ≠ 向量化**——未跑 `update_db.py` 前，RAG 查不到這些新條目。
+- 希望新條目**立刻**可被檢索，而不是等到下次查詢時才補（例如精煉後想立即抽查）。
+- 想看索引狀態與各階段耗時，而不必發出一次查詢。
+
+`update_db.py --rebuild` 強制重算全部條目（1265 筆規模約 6 分鐘），僅在需要讓向量與最新文字格式完全對應時使用，正常運作不需要。
+
+### 3.5 內容定址與索引日誌
+
+冷庫條目的向量庫 id 為 `cold-notes#<語意雜湊>`（`kb_reader.semantic_hash()`），雜湊只涵蓋 `topic` / `content` / `tags` / `skill` / `memory_type`，刻意排除 `date` / `time` / `project` / `quality` 與所有模板字串；行號降級為 metadata 的 `line` 欄位，並隨每筆冷庫命中一起回傳，結果仍可追溯回原始行。
+
+這個設計消除兩類全庫重算：
+
+- **刪改 `raw.jsonl` 中間任一行**不再讓其後條目位移。舊設計以 `#L{行號}` 為 id，位移點之後每一筆都會同時觸發「新 id 重算」與「舊 id 孤立」。實測：928 行的冷庫刪掉正中間一行，重算 **0** 筆——其後 463 筆只更新了 `line` metadata，零 embedding 成本。
+- **調整 text 組裝格式**不再讓全庫失效。舊設計的增量比對直接比對完整組裝字串，光是多一行「記憶類型：」就會讓 918 筆冷庫條目全數被判為已變動。
+
+每次索引執行會追加一行到 `logs/index-runs.jsonl`，含各階段耗時與重算原因分類（`new` / `text-changed` / `id-missing`）。單次重算超過庫內 20% 時主動警告；若原因為 `id-missing`，通常代表 repo 版與 `~/.claude/skills` 安裝副本的 `kb_reader.py` 不同版——兩者組出的索引文字不同，於是互相把對方的條目視為已變動。
 
 ---
 
