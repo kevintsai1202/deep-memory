@@ -8,6 +8,7 @@ search.py 與 update_db.py 都從這裡 import，確保兩邊看到的文件集�
 import os
 import re
 import json
+import hashlib
 
 # 條目切段邊界：每個 "## 🔧" 標題開始一個新條目
 _ENTRY_HEADING = re.compile(r"(?=^## 🔧 )", re.MULTILINE)
@@ -85,7 +86,8 @@ def read_knowledge_base(base_dir):
         entries = split_entries(content)
         if not entries:
             # 不符 "## 🔧" 範本的舊檔案／自訂檔案：整份當一份文件索引，維持向下相容
-            doc = {"path": rel_path, "text": content, "source": "hot", "memory_type": memory_type}
+            doc = {"path": rel_path, "text": content, "source": "hot",
+                   "memory_type": memory_type, "content_hash": hot_entry_hash(content)}
             if skill:
                 doc["skill"] = skill
             docs.append(doc)
@@ -104,7 +106,8 @@ def read_knowledge_base(base_dir):
                 "path": f"{rel_path}#{slug}",
                 "text": entry_text,
                 "source": "hot",
-                "memory_type": memory_type
+                "memory_type": memory_type,
+                "content_hash": hot_entry_hash(entry_text)
             }
             if entry_skill:
                 doc["skill"] = entry_skill
@@ -125,6 +128,32 @@ def infer_memory_type(entry):
     if skill in {"", "general", "none", "deep-memory"}:
         return "knowledge"
     return "experience"
+
+
+def semantic_hash(entry):
+    """計算冷庫條目的語意雜湊，作為向量庫 ID 與增量比對鍵。
+
+    刻意只涵蓋影響檢索語意的欄位（topic/content/tags/skill/memory_type），
+    排除 date/time/project/quality 與所有模板字串——這讓「調整 text 組裝格式」
+    或「精煉時標記 reviewed」都不會被誤判為內容變動而觸發重算。
+    """
+    payload = json.dumps({
+        "topic":       entry.get("topic", ""),
+        "content":     entry.get("content", ""),
+        "tags":        entry.get("tags", []),
+        "skill":       entry.get("skill", "general"),
+        "memory_type": infer_memory_type(entry),
+    }, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:12]
+
+
+def hot_entry_hash(text):
+    """計算熱庫條目的內容雜湊。
+
+    熱庫 text 即 markdown 原文、無模板組裝，故直接雜湊全文即可，
+    不存在冷庫那種「格式演進導致全庫失效」的問題。
+    """
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()[:12]
 
 
 def read_cold_notes(base_dir):
@@ -157,7 +186,8 @@ def read_cold_notes(base_dir):
                     "source": "cold",
                     "tags": entry.get("tags", []),
                     "skill": entry.get("skill", "general"),
-                    "memory_type": memory_type
+                    "memory_type": memory_type,
+                    "content_hash": semantic_hash(entry)
                 }
                 # project 欄位是後補的：寫入時間早於此改動的舊條目沒有這個 key，
                 # 這裡刻意用 entry.get() 而不給預設值，讓舊條目維持「不屬於任何專案」，
