@@ -881,6 +881,14 @@
         <div class="mono" style="color: var(--text-muted); font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 16px; text-align: center;">{{t.changelog_badge}}</div>
         <div style="display: flex; flex-direction: column; gap: 12px;">
           <div style="display: flex; gap: 16px; font-size: 13.5px; line-height: 1.6;">
+            <span class="mono" style="color: var(--text-muted); flex-shrink: 0; width: 88px;">{{t.changelog_v6_date}}</span>
+            <span style="color: var(--text-secondary);">{{t.changelog_v6_desc}}</span>
+          </div>
+          <div style="display: flex; gap: 16px; font-size: 13.5px; line-height: 1.6;">
+            <span class="mono" style="color: var(--text-muted); flex-shrink: 0; width: 88px;">{{t.changelog_v5_date}}</span>
+            <span style="color: var(--text-secondary);">{{t.changelog_v5_desc}}</span>
+          </div>
+          <div style="display: flex; gap: 16px; font-size: 13.5px; line-height: 1.6;">
             <span class="mono" style="color: var(--text-muted); flex-shrink: 0; width: 88px;">{{t.changelog_v4_date}}</span>
             <span style="color: var(--text-secondary);">{{t.changelog_v4_desc}}</span>
           </div>
@@ -1007,6 +1015,10 @@ const T = {
     dashboard_p3: "搜尋 · 點擊聚焦鄰域 · 類型開關 · hover 顯示名稱",
 
     changelog_badge: "更新紀錄",
+    changelog_v6_date: "2026-08-01",
+    changelog_v6_desc: "索引改為內容定址：冷庫條目的向量庫 ID 從行號改為語意雜湊，刪改 `raw.jsonl` 中任一行不再讓其後的條目全數重算（實測 928 行的冷庫刪掉正中間一行，重算 0 筆）。增量比對改比 `content_hash` 而非完整組裝文字，調整顯示格式也不再觸發全庫重建。`search.py` 於查詢前自動補索引（失敗只警告、不阻擋查詢），日常不需再手動執行 `update_db.py`。每次索引執行寫入 `logs/index-runs.jsonl`，記錄各階段耗時與重算原因分類（new / text-changed / id-missing），重算比例超過兩成時主動警告。既有索引自動遷移：實測 910 筆 17.5 秒且不重算任何向量，並會回填舊版熱庫條目缺少的雜湊，避免升級時白白重算數百筆未變動的內容。",
+    changelog_v5_date: "2026-07-08",
+    changelog_v5_desc: "新增經驗熱庫自動修正流程：`refine_experience.py` 會掃描 `memory_type=experience` / `both` 的 cold notes，依 skill 分組提升到 `experience/skill-[skill-id].md`，同步更新 `experience/_index.json` 並標記來源 reviewed。這補上先前「有紀錄但經驗庫看起來不足」的落差，讓技能踩坑能真的進入跨技能經驗層。",
     changelog_v4_date: "2026-07-07",
     changelog_v4_desc: "冷庫條目新增 `memory_type`（knowledge / experience / both）：寫入時可先標記通用知識、技能經驗或兩者皆有，精煉時再分流到 `knowledge-base/` 或 `experience/skill-[skill-id].md`。`write_cold.py` 支援 `--memory-type`，`search.py` 支援同欄位篩選，並新增遷移腳本替既有 cold notes 回填類型後重建索引。",
     changelog_v3_date: "2026-07-06",
@@ -1105,6 +1117,10 @@ const T = {
     dashboard_p3: "Search · click-to-focus · type toggles · hover labels",
 
     changelog_badge: "Changelog",
+    changelog_v6_date: "2026-08-01",
+    changelog_v6_desc: "Indexing is now content-addressed: cold-store entries are keyed by a semantic hash instead of a line number, so editing or deleting any line in `raw.jsonl` no longer forces every entry below it to be re-embedded (measured: removing the middle line of a 928-line store re-embedded 0 entries). Incremental comparison reads `content_hash` rather than the full assembled text, so changing display formatting no longer triggers a full rebuild. `search.py` tops up the index before querying — failures warn but never block the search — so `update_db.py` is out of the daily loop. Every run appends to `logs/index-runs.jsonl` with per-stage timings and a reason breakdown (new / text-changed / id-missing), warning when more than 20% of the store is re-embedded. Existing indexes migrate automatically: 910 entries in 17.5s with zero re-embedding, and hashes missing from older hot-store entries are backfilled so upgrading doesn't needlessly recompute hundreds of unchanged entries.",
+    changelog_v5_date: "2026-07-08",
+    changelog_v5_desc: "New automatic experience hot-store refinement: `refine_experience.py` scans `memory_type=experience` / `both` cold notes, groups them by skill, promotes them into `experience/skill-[skill-id].md`, updates `experience/_index.json`, and marks sources reviewed. This fixes the earlier gap where notes existed but the cross-skill experience store still looked thin.",
     changelog_v4_date: "2026-07-07",
     changelog_v4_desc: "Cold-store entries now carry `memory_type` (knowledge / experience / both): agents can mark general knowledge, skill experience, or a record that should be split during refinement. Refinement routes them to `knowledge-base/` or `experience/skill-[skill-id].md`; `write_cold.py` accepts `--memory-type`, `search.py` can filter by it, and a migration script backfills existing cold notes before rebuilding the index.",
     changelog_v3_date: "2026-07-06",
