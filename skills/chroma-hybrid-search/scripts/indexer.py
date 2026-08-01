@@ -6,7 +6,9 @@ indexer.py
 從 update_db.py 抽出，讓 search.py 能共用同一套增量邏輯做自動補索引，
 避免兩邊各寫一份而發散——兩邊對「什麼算變動」的認定必須永遠一致。
 """
+import json
 import os
+from datetime import datetime
 
 # 索引 schema 版本。變更 ID 格式或 metadata 必要欄位時才遞增。
 SCHEMA_VERSION = 2
@@ -228,3 +230,49 @@ def build_plan(collection, docs):
     plan.reasons["new"] -= shifted
 
     return plan
+
+
+# 單次重算超過庫內既有筆數的此比例即視為異常，主動提示而非默默跑完
+ANOMALY_RATIO = 0.2
+
+
+def write_run_log(base_dir, record):
+    """把一次索引執行追加為一行 JSON 到 logs/index-runs.jsonl。
+
+    採 JSONL 而非人類可讀格式，是為了讓「這半年索引變慢過幾次、各是什麼原因」
+    能直接用程式彙總。單行約 300 bytes，每日十次執行一年約 1 MB，不需輪替。
+    """
+    log_dir = os.path.join(str(base_dir), "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    path = os.path.join(log_dir, "index-runs.jsonl")
+    payload = {"ts": datetime.now().isoformat(timespec="seconds"),
+               "schema_version": SCHEMA_VERSION}
+    payload.update(record)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    return path
+
+
+def format_anomaly_warning(plan, total):
+    """重算規模異常時產生警告文字，沒有異常則回傳 None。
+
+    total 為庫內既有筆數：首次建庫（total=0）全是新條目屬正常，不該報警。
+    直接把原因分佈印在 console，使用者不必事後翻日誌才知道自己在等什麼。
+    """
+    if total <= 0 or not plan.embed_ids:
+        return None
+    ratio = len(plan.embed_ids) / total
+    if ratio < ANOMALY_RATIO:
+        return None
+
+    reasons = ", ".join(f"{k}={v}" for k, v in plan.reasons.items() if v)
+    lines = [
+        f"[⚠️ 異常] 本次需重算 {len(plan.embed_ids)} 筆，佔庫內 {total} 筆的 {ratio:.0%}。",
+        f"  重算原因分佈：{reasons}",
+    ]
+    if plan.reasons.get("id-missing"):
+        lines.append("  出現 id-missing：通常代表 ID 位移，或執行中的腳本版本與"
+                     "建立索引時不同（例如 repo 版與 ~/.claude/skills 安裝副本不一致）。")
+        lines.append("  請先確認兩處的 kb_reader.py 一致再重跑。")
+    lines.append(f"  樣本：{', '.join(plan.embed_ids[:3])}")
+    return "\n".join(lines)

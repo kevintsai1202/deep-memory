@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """indexer 的 schema 偵測與增量比對測試（需 venv，會用到 chromadb 記憶體模式）"""
+import json
 import os
 import tempfile
 import unittest
+from pathlib import Path
 
 import chromadb
 
@@ -256,6 +258,46 @@ class TestMigrateToV2(unittest.TestCase):
         self.assertIn("cold-notes#aaaaaaaaaaaa", str(ctx.exception))
         ids = set(col.get(include=[])["ids"])
         self.assertIn("cold-notes/raw.jsonl#L1", ids)
+
+
+class TestRunLog(unittest.TestCase):
+    def test_appends_one_json_line_per_run(self):
+        base = Path(tempfile.mkdtemp())
+        indexer.write_run_log(base, {"trigger": "update_db", "total": 10, "embedded": 1})
+        indexer.write_run_log(base, {"trigger": "search-auto", "total": 10, "embedded": 0})
+        lines = (base / "logs" / "index-runs.jsonl").read_text(encoding="utf-8").strip().splitlines()
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(json.loads(lines[1])["trigger"], "search-auto")
+
+    def test_log_record_carries_timestamp_and_schema_version(self):
+        base = Path(tempfile.mkdtemp())
+        indexer.write_run_log(base, {"trigger": "update_db", "total": 1, "embedded": 0})
+        record = json.loads((base / "logs" / "index-runs.jsonl").read_text(encoding="utf-8").strip())
+        self.assertIn("ts", record)
+        self.assertEqual(record["schema_version"], indexer.SCHEMA_VERSION)
+
+
+class TestAnomalyWarning(unittest.TestCase):
+    def _plan_with(self, embed_count, reasons):
+        plan = indexer.IndexPlan()
+        plan.embed_ids = [f"id-{i}" for i in range(embed_count)]
+        plan.reasons = reasons
+        return plan
+
+    def test_no_warning_below_threshold(self):
+        plan = self._plan_with(5, {"new": 5, "text-changed": 0, "id-missing": 0})
+        self.assertIsNone(indexer.format_anomaly_warning(plan, total=100))
+
+    def test_warns_above_threshold(self):
+        plan = self._plan_with(30, {"new": 0, "text-changed": 0, "id-missing": 30})
+        warning = indexer.format_anomaly_warning(plan, total=100)
+        self.assertIsNotNone(warning)
+        self.assertIn("id-missing", warning)
+
+    def test_no_warning_when_collection_is_empty(self):
+        # 首次建庫全部都是新條目，不該被當成異常
+        plan = self._plan_with(100, {"new": 100, "text-changed": 0, "id-missing": 0})
+        self.assertIsNone(indexer.format_anomaly_warning(plan, total=0))
 
 
 if __name__ == "__main__":
