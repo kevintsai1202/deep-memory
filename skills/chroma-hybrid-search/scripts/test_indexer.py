@@ -231,6 +231,32 @@ class TestMigrateToV2(unittest.TestCase):
         self.assertIn("cold-notes#111111111111", ids)
         self.assertNotIn("cold-notes/raw.jsonl#L2", ids)
 
+    def test_low_match_rate_aborts_without_deleting(self):
+        # 冷庫 text 組裝格式若變動，文字比對會大量落空。此時明確中止且不刪任何
+        # legacy ID——把問題留在原地讓人檢查，好過默默丟掉已算好的向量再花數分鐘重算。
+        col = self._legacy_collection()
+        with self.assertRaises(RuntimeError) as ctx:
+            indexer.migrate_to_v2(col, None,
+                                  [doc("cold-notes#999999999999", "完全不同的文字",
+                                       "999999999999", line=1)])
+        self.assertIn("配對", str(ctx.exception))
+        ids = set(col.get(include=[])["ids"])
+        self.assertIn("cold-notes/raw.jsonl#L1", ids)
+        self.assertIn("cold-notes/raw.jsonl#L2", ids)
+
+    def test_duplicate_target_id_aborts_without_deleting(self):
+        # 兩筆 legacy 條目對應到同一個新 ID（語意欄位相同但 text 不同，例如只差日期）：
+        # 必須在任何寫入之前中止，訊息要指出是 raw.jsonl 需要去重。
+        # 注意此情境的配對率是 100%，不會被 match-rate 守衛攔下，走的確實是重複偵測那條路。
+        col = self._legacy_collection()
+        dup = [doc("cold-notes#aaaaaaaaaaaa", "冷一", "aaaaaaaaaaaa", line=1),
+               doc("cold-notes#aaaaaaaaaaaa", "冷二", "aaaaaaaaaaaa", line=2)]
+        with self.assertRaises(RuntimeError) as ctx:
+            indexer.migrate_to_v2(col, None, dup)
+        self.assertIn("cold-notes#aaaaaaaaaaaa", str(ctx.exception))
+        ids = set(col.get(include=[])["ids"])
+        self.assertIn("cold-notes/raw.jsonl#L1", ids)
+
 
 if __name__ == "__main__":
     unittest.main()

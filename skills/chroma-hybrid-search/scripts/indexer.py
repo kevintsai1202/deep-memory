@@ -77,10 +77,13 @@ class IndexPlan:
 def _backup_db(db_path):
     """遷移前完整複製資料庫目錄，讓任何中斷都能原樣還原。
 
-    27 MB 規模下實測約 0.06 秒，這個保險非常便宜。
+    27 MB 規模下實測約 0.06 秒，這個保險非常便宜。向量庫本身可從 raw.jsonl／
+    knowledge-base／experience 完全重建（遷移全程不觸碰這些來源檔），所以備份
+    防的不是資料遺失，而是讓中斷後的復原不必走「當新條目重新計算 embedding」
+    的慢路徑（1263 筆約 6.4 分鐘）。
     db_path 為 None 時（記憶體測試）跳過；db_path 有給值但不是目錄時 raise，
-    不能悄悄跳過——正式環境下若因路徑打錯或資料庫還沒建立就無聲略過備份，
-    遷移會在對著使用者不可重建的記憶庫、毫無保護的情況下照跑。
+    不能悄悄跳過——路徑打錯或資料庫還沒建立時，讓這個便宜的保險無聲消失沒有
+    任何好處，只會讓中斷後的排查更麻煩。
     """
     if db_path is None:
         return None
@@ -101,6 +104,10 @@ def migrate_to_v2(collection, db_path, cold_docs):
 
     以「舊文字 → 新 doc」建立對應，因為此時 raw.jsonl 的行號與庫內舊 ID 未必
     仍然對齊（若已有人刪改過行）；用文字比對才不會把向量接到錯的條目上。
+
+    中止條件（以下皆 raise RuntimeError，保留原狀不動）：備份路徑無效
+    （db_path 有給值但不是目錄）、配對率低於五成、多筆 legacy 條目配對到同一個
+    新 ID（raw.jsonl 語意重複）、upsert 後新 ID 未全數就位。
     """
     legacy_ids = [i for i in collection.get(include=[])["ids"]
                   if i.startswith(LEGACY_COLD_PREFIX)]
@@ -127,9 +134,15 @@ def migrate_to_v2(collection, db_path, cold_docs):
         docs_out.append(target["text"])
         metas.append(build_metadata(target))
 
-    # 配對率過低（含 0）代表冷庫 text 組裝格式可能已變動，讓舊向量的 documents
-    # 對不上任何新 doc 的 text；默默只搬走配對上的那幾筆會讓其餘向量無聲孤立，
-    # 比直接中止更危險。門檻定得寬鬆（五成），只在明顯異常時才擋。
+    # 未配對有兩種來源：使用者刪除了冷庫記錄（正常，通常是個位數），或冷庫 text
+    # 組裝格式漂移（異常，通常是大規模）。兩者無法從單筆判斷，只能從量級區分——
+    # 超過一半配不上，幾乎不可能是手動刪除累積出來的比例，實務上必然是格式問題，
+    # 這才是門檻定在五成的理由，不是為了配合任何測試案例。
+    #
+    # 低於門檻的不匹配刻意不中止：這些條目會在 build_plan 被當成新條目重新計算
+    # embedding，結果仍然正確、只是較慢（向量庫可從 raw.jsonl／knowledge-base／
+    # experience 完全重建，並非遺失資料）；Task 4 的 20% 重算異常警告是第二層
+    # 防線，兩層門檻各司其職。
     matched, total = len(new_ids), len(legacy_ids)
     if matched < total * 0.5:
         raise RuntimeError(
