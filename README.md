@@ -179,6 +179,12 @@ This only places the skill files — you still need to run the Python initializa
 
 ## Changelog
 
+### 2026-09-23
+
+- Added `refine_prepare.py`: before refining, pending cold notes are grouped into packs by project + theme, near-duplicates are flagged, and each entry gets its top-3 closest hot-store entries (hybrid search) plus a suggested target file — so several subagents can draft in parallel instead of one agent reading the whole cold store and grepping the hot store per cluster (the old flow took ~15 minutes for 184 entries).
+- Added `refine_apply.py`: applies drafts in a fixed format (TARGET / APPEND-TO / NEW CATEGORY / KEYWORDS / REVIEWED) to the hot store; validates line coverage, content hashes, and targets before writing, backs up first, supports `--dry-run`.
+- `write_cold.py` now hints at refinement by pending count (≥ 30) instead of the total line count, so it no longer nags on every write.
+
 ### 2026-07-08
 
 - Added `skills/deep-memory/scripts/refine_experience.py` to promote `memory_type=experience` / `both` cold notes into `experience/skill-[skill-id].md`. This closes the earlier "experience looks empty" gap: cold notes can now be classified, filtered, promoted into the cross-skill experience hot store, marked reviewed, re-indexed, and verified with `search.py --memory-type experience`.

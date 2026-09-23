@@ -28,6 +28,43 @@ def resolve_memory_type(memory_type, skill):
     return "experience"
 
 
+# 精煉提醒閾值：「待精煉（quality 不是 reviewed）」≥ 30 筆才提醒。
+# 以總筆數判斷會在冷庫累積數千筆、且多數已精煉後每寫一筆都提醒（2026-09-23 修正）；
+# 30 筆約是一次小批精煉的適當量，夠小才能讓子代理快速處理，夠大才不會頻繁打斷。
+REFINE_THRESHOLD = 30
+
+
+def count_notes(jsonl_path):
+    """統計冷庫總筆數與待精煉筆數；無法解析的行計入總數但不算待精煉。"""
+    total = 0
+    pending = 0
+    with open(jsonl_path, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            total += 1
+            try:
+                entry = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(entry, dict) and entry.get("quality") != "reviewed":
+                pending += 1
+    return total, pending
+
+
+def refine_hint(total, pending, threshold=None):
+    """待精煉筆數達門檻時回傳提示文字行；未達門檻回傳空清單。"""
+    threshold = REFINE_THRESHOLD if threshold is None else threshold
+    if pending < threshold:
+        return []
+    return [
+        "",
+        f"[⚠️ 精煉提示] 冷庫待精煉 {pending} 筆（≥ {threshold} 筆；冷庫總數 {total} 筆）。",
+        "  建議執行精煉流程：refine_prepare.py 分包 → 平行子代理起草 → refine_apply.py 套用。",
+        "  請告知 Agent：「幫我精煉冷庫」",
+    ]
+
+
 def main():
     parser = argparse.ArgumentParser(description="Append a raw note to cold store (cold-notes/raw.jsonl)")
     # 優先從環境變數 DEEP_MEMORY_WORKSPACE 取得工作目錄，否則預設為使用者家目錄下的 .deep-memory
@@ -77,22 +114,16 @@ def main():
     with open(jsonl_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
-    # 統計目前冷庫條目數
-    with open(jsonl_path, "r", encoding="utf-8") as f:
-        count = sum(1 for line in f if line.strip())
+    # 統計目前冷庫條目數（總數與待精煉數）
+    total, pending = count_notes(jsonl_path)
 
     print(f"[OK] 冷庫已寫入：{args.topic}（專案：{project}）")
     print(f"[INFO] 記憶類型：{memory_type}")
-    print(f"[INFO] 冷庫目前共 {count} 筆條目")
+    print(f"[INFO] 冷庫目前共 {total} 筆條目，其中待精煉 {pending} 筆")
 
-    # 精煉提醒閾值：≥ 20 筆時提醒（憑經驗選擇的中間值——夠小才不會讓冷庫無限累積
-    # 未精煉的雜訊，夠大才不會每寫幾筆就打斷一次；非精確調校過的數字，可依實際使用調整）
-    REFINE_THRESHOLD = 20
-    if count >= REFINE_THRESHOLD:
-        print()
-        print(f"[⚠️ 精煉提示] 冷庫已累積 {count} 筆原始記錄（≥ {REFINE_THRESHOLD} 筆）。")
-        print("  建議執行精煉流程，依 memory_type 將高頻/高價值條目分流到 knowledge-base/ 或 experience/。")
-        print("  請告知 Agent：「幫我精煉冷庫」")
+    for line in refine_hint(total, pending):
+        print(line)
+
 
 if __name__ == "__main__":
     main()

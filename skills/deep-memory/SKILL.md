@@ -19,7 +19,7 @@ description: "Use at the start of any task, whenever another skill is about to b
 > - If you want to use a specific directory, set the `DEEP_MEMORY_WORKSPACE` environment variable (e.g., `DEEP_MEMORY_WORKSPACE="."` or `DEEP_MEMORY_WORKSPACE="D:\my-memories"`).
 > - You can also pass `--workspace <path>` to any script to override the workspace path for that specific command.
 >
-> **Which scripts actually need `<PY>` (the venv):** only `search.py`, `update_db.py`, and `export_jsonl.py` — they import `chromadb`/`onnxruntime`. `seed.py`, `write_cold.py`, `backup.py`, `restore.py`, and `memory-import/scripts/import.py` use only Python's standard library: any available `python`/`python3` works for those, no venv or `pip install` required. This matters because cold-store writes (Step 5.1) start from turn one, often before the venv exists.
+> **Which scripts actually need `<PY>` (the venv):** only `search.py`, `update_db.py`, `export_jsonl.py`, and `refine_prepare.py` (unless run with `--no-candidates`) — they import `chromadb`/`onnxruntime`. `seed.py`, `write_cold.py`, `refine_apply.py`, `backup.py`, `restore.py`, and `memory-import/scripts/import.py` use only Python's standard library: any available `python`/`python3` works for those, no venv or `pip install` required. This matters because cold-store writes (Step 5.1) start from turn one, often before the venv exists.
 
 ## Core Loop (Steps 0–5)
 
@@ -246,6 +246,26 @@ python skills/deep-memory/scripts/migrate_memory_type.py
 The migration is idempotent. It preserves invalid JSONL lines as-is, only updates entries missing a valid `memory_type`, and infers `knowledge` for `general` / `deep-memory` / empty skill values and `experience` for other skill IDs.
 
 ---
+
+## Cold Store Refinement (Tool-Assisted)
+
+**Trigger phrases**: 「幫我精煉冷庫」「精煉冷庫」「refine the cold store」, or `write_cold.py` reporting ≥ 30 pending entries.
+
+```bash
+# 1. Pack pending entries (groups, near-duplicate flags, top-3 hot-store candidates, suggested targets)
+<PY> skills/deep-memory/scripts/refine_prepare.py
+
+# 2. Dispatch one subagent per pack in parallel → each writes pack-NN.drafts.md (format contract is inside every pack)
+
+# 3. Preview, confirm with the user, then apply (backs up first; marks every listed line reviewed)
+python skills/deep-memory/scripts/refine_apply.py --work-dir <workspace>/refine-work/<run-id> --dry-run
+python skills/deep-memory/scripts/refine_apply.py --work-dir <workspace>/refine-work/<run-id>
+
+# 4. Re-index and spot-check a new entry
+<PY> skills/chroma-hybrid-search/scripts/update_db.py
+```
+
+Full workflow, the draft format, and validation rules: `resources/cold-store-and-vectorization.md` → Refinement Workflow. Never have one agent read the whole cold store and grep the hot store per cluster — that is what made a 184-entry run take ~15 minutes.
 
 ## Experience Refinement
 

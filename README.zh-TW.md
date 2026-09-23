@@ -184,6 +184,12 @@ npx skills add kevintsai1202/deep-memory --skill deep-memory -a claude-code -g
 
 ## Changelog
 
+### 2026-09-23
+
+- 新增 `refine_prepare.py`：精煉前先把待精煉冷庫條目依專案＋主題分包、標註近似重複、用混合檢索列出每筆最相近的 3 條熱庫條目與建議目標檔，讓多個子代理平行起草，不必由單一代理讀完整個冷庫再逐群 grep 熱庫（實測 184 筆舊流程約 15 分鐘）。
+- 新增 `refine_apply.py`：依固定草稿格式（TARGET／APPEND-TO／NEW CATEGORY／KEYWORDS／REVIEWED）套用到熱庫；寫入前驗證行號涵蓋、內容雜湊、目標存在，先備份，支援 `--dry-run`。
+- `write_cold.py` 的精煉提示改看「待精煉筆數」（≥ 30），不再因冷庫總數每寫一筆就提示。
+
 ### 2026-07-08
 
 - 新增 `skills/deep-memory/scripts/refine_experience.py`，可把 `memory_type=experience` / `both` 的 cold notes 提升到 `experience/skill-[skill-id].md`。這補上先前「經驗看起來不足」的落差：cold notes 現在可以先分類、篩選，再提升到跨技能經驗熱庫、標記 reviewed、重建索引，並用 `search.py --memory-type experience` 驗證。
