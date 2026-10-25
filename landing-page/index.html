@@ -600,8 +600,8 @@
               style="background: var(--bg-primary); border: 1px solid rgba(255,255,255,0.03); border-radius: 8px; padding: 12px 16px; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); line-height: 1.5;">
               <span style="color: var(--brand-color);">Local RAG Engine:</span> ChromaDB + BM25<br />
               <span style="color: #60a5fa;">Inference:</span> ONNX Runtime (no PyTorch)<br />
-              <span style="color: #34d399;">Cold Start:</span> ~1s index &middot; ~7s search<br />
-              <span style="color: var(--text-muted);">100% Private &amp; Offline Ready</span>
+              <span style="color: #34d399;">~3,300 entries:</span> ~2s index &middot; ~30–40s search (~20s with Jev)<br />
+              <span style="color: var(--text-muted);">Private by default &amp; Offline Ready</span>
             </div>
           </div>
 
@@ -1080,7 +1080,7 @@ const T = {
     
     features_card3_tag: "Offline Search",
     features_card3_title: "本機 RAG 混合檢索",
-    features_card3_desc: "整合本機 ChromaDB 向量檢索與 BM25 關鍵字檢索，並經由 CPU 進行重排（Rerank）。推論改採 ONNX Runtime 輕量引擎——不需 PyTorch，索引更新約 1 秒、完整檢索約 7 秒，安裝體積從 3 GB 縮至 200 MB。無須連接外部雲端資料庫；未開啟可選的 Jev 雲端重排時，資料全程不離開本機。",
+    features_card3_desc: "整合本機 ChromaDB 向量檢索與 BM25 關鍵字檢索，並經由 CPU 進行重排（Rerank）。推論改採 ONNX Runtime 輕量引擎——不需 PyTorch，索引無變動時約 2 秒；約 3,300 筆規模下完整檢索本機約 30～40 秒、開啟 Jev 約 20 秒，安裝體積從 3 GB 縮至 200 MB。無須連接外部雲端資料庫；未開啟可選的 Jev 雲端重排時，資料全程不離開本機。",
     
     features_card4_tag: "Sync & Backup",
     features_card4_title: "跨系統同步與安全備份",
@@ -1204,7 +1204,7 @@ const T = {
     
     features_card3_tag: "Offline Search",
     features_card3_title: "Local hybrid retrieval",
-    features_card3_desc: "Combines ChromaDB vector search with BM25 keyword matching, reranked locally on CPU. Inference runs on the lightweight ONNX Runtime — no PyTorch required: index updates in ~1s, full retrieval in ~7s, and the install footprint shrinks from 3 GB to 200 MB. No external cloud database needed; unless you turn on the optional Jev cloud re-ranker, your data never leaves the machine.",
+    features_card3_desc: "Combines ChromaDB vector search with BM25 keyword matching, reranked locally on CPU. Inference runs on the lightweight ONNX Runtime — no PyTorch required: a no-change index refresh takes ~2 s; at ~3,300 entries a full retrieval takes ~30–40 s locally or ~20 s with Jev, and the install footprint shrinks from 3 GB to 200 MB. No external cloud database needed; unless you turn on the optional Jev cloud re-ranker, your data never leaves the machine.",
     
     features_card4_tag: "Sync & Backup",
     features_card4_title: "Cross-system sync & safe backup",

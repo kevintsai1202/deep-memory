@@ -1,6 +1,6 @@
 # Deep-Memory 檢索與索引效能優化計畫（7,800+ 條目規模實測改造）
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 將 `deep-memory` 在 ~7,800 筆向量資料規模下的單次 RAG 檢索時間從 **36.8 秒降至約 12～15 秒（提速 2.5 倍以上）**，消除已精煉冷庫筆記（4,502 筆 `reviewed`）對向量庫與 BM25 的雙重污染，並為超過 50 KB 的巨型經驗檔（最高 433 KB）補齊 Context Window 防爆保護。
 
@@ -93,7 +93,7 @@
   - 預設 `include_reviewed=False`：當 `entry.get("quality") == "reviewed"` 時直接 `continue` 跳過（注意：**行號 `i + 1` 仍以檔案真實行號計算**，不受跳過影響，確保 `#L<行號>` 永遠對準 `raw.jsonl` 的實體行）。
   - 當 `include_reviewed=True` 時：保留載入全部冷庫條目的能力（供未來若有全歷史稽核需求時呼叫）。
 
-- [ ] **Step 1: 在 `test_kb_reader.py` 撰寫失敗測試**
+- [x] **Step 1: 在 `test_kb_reader.py` 撰寫失敗測試**
 
 在 `skills/chroma-hybrid-search/scripts/test_kb_reader.py` 的 `TestDocsCarryContentHash` 類別中新增測試方法：
 
@@ -119,7 +119,7 @@
         self.assertEqual([d["line"] for d in docs_all], [1, 2, 3])
 ```
 
-- [ ] **Step 2: 執行測試確認失敗**
+- [x] **Step 2: 執行測試確認失敗**
 
 Run:
 ```powershell
@@ -127,7 +127,7 @@ Run:
 ```
 Expected: `FAIL: test_read_cold_notes_skips_reviewed_by_default_and_preserves_line_numbers`（目前讀出 3 筆而非 2 筆）。
 
-- [ ] **Step 3: 修改 `kb_reader.py` 的 `read_cold_notes` 實作**
+- [x] **Step 3: 修改 `kb_reader.py` 的 `read_cold_notes` 實作**
 
 修改 `skills/chroma-hybrid-search/scripts/kb_reader.py` 第 159–175 行：
 
@@ -159,7 +159,7 @@ def read_cold_notes(base_dir, include_reviewed=False):
                 tags_str = ", ".join(entry.get("tags", []))
 ```
 
-- [ ] **Step 4: 執行測試確認通過**
+- [x] **Step 4: 執行測試確認通過**
 
 Run:
 ```powershell
@@ -189,7 +189,7 @@ Expected: All tests `OK`.
 2. **消除 `search.py` 的第二次硬碟讀檔**：
    - `sync(..., return_docs=False)` 與 `ensure_fresh(base_dir, verbose=False, return_docs=False)`：當 `return_docs=True` 時，回傳 `(result, docs)`（若 `ensure_fresh` 發生例外失敗，則回傳 `(None, None)`，由 `search.py` fallback 自行讀取）。
 
-- [ ] **Step 1: 在 `test_indexer.py` 撰寫失敗測試**
+- [x] **Step 1: 在 `test_indexer.py` 撰寫失敗測試**
 
 在 `skills/chroma-hybrid-search/scripts/test_indexer.py` 新增測試類別 `TestSyncSingleGetOptimization`：
 
@@ -232,7 +232,7 @@ class TestSyncSingleGetOptimization(unittest.TestCase):
         self.assertEqual(docs[0]["path"], hot_doc["path"])
 ```
 
-- [ ] **Step 2: 執行測試確認失敗**
+- [x] **Step 2: 執行測試確認失敗**
 
 Run:
 ```powershell
@@ -240,7 +240,7 @@ Run:
 ```
 Expected: `FAIL` or `TypeError: ensure_fresh() got an unexpected keyword argument 'return_docs'`（且原本會呼叫 5 次 `collection.get`）。
 
-- [ ] **Step 3: 修改 `indexer.py` 實作單次快照與 `return_docs`**
+- [x] **Step 3: 修改 `indexer.py` 實作單次快照與 `return_docs`**
 
 修改 `skills/chroma-hybrid-search/scripts/indexer.py`：
 1. `detect_schema(collection, existing=None)`：
@@ -324,7 +324,7 @@ Expected: `FAIL` or `TypeError: ensure_fresh() got an unexpected keyword argumen
            return (None, None) if return_docs else None
    ```
 
-- [ ] **Step 4: 執行測試確認通過**
+- [x] **Step 4: 執行測試確認通過**
 
 Run:
 ```powershell
@@ -354,7 +354,7 @@ Expected: All tests in `test_indexer.py` pass (`OK`).
      - 新增 `--rerank-max-chars` 參數（預設 `800` 字元，傳 `0` 代表不截斷），重排送入 `reranker.predict` 時取 `doc_map[path]["text"][:args.rerank_max_chars]`，而最終回傳給 Agent 的 `_make_hit()` **仍然保留完整未截斷的 `doc_map[path]["text"]`**。
      - `search.py` 呼叫 `_, all_docs = indexer.ensure_fresh(base_dir, return_docs=True)`，當 `all_docs is None`（例如傳了 `--no-auto-index` 或索引失敗）時才呼叫 `read_knowledge_base(base_dir) + read_cold_notes(base_dir)`。
 
-- [ ] **Step 1: 建立 `test_search_perf.py` 撰寫測試**
+- [x] **Step 1: 建立 `test_search_perf.py` 撰寫測試**
 
 建立 `skills/chroma-hybrid-search/scripts/test_search_perf.py`：
 
@@ -427,7 +427,7 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-- [ ] **Step 2: 執行測試確認失敗**
+- [x] **Step 2: 執行測試確認失敗**
 
 Run:
 ```powershell
@@ -435,7 +435,7 @@ Run:
 ```
 Expected: `FAIL` / `TypeError: run_search() got an unexpected keyword argument 'reranker_holder'`.
 
-- [ ] **Step 3: 修改 `onnx_models.py` 與 `search.py`**
+- [x] **Step 3: 修改 `onnx_models.py` 與 `search.py`**
 
 1. 修改 `skills/chroma-hybrid-search/scripts/onnx_models.py` 的 `OnnxReranker`：
    - 移除 `__init__` 中的固定整批 padding，改在 `predict()` 中逐筆（或依長度排序分小批）推論，避免 1 篇 512-token 長文把同批 9 篇 60-token 短文全部 pad 到 512 tokens：
@@ -471,7 +471,7 @@ Expected: `FAIL` / `TypeError: run_search() got an unexpected keyword argument '
      - 新增 `--rerank-max-chars` 參數（預設 `800`）。
      - 透過 `_, all_docs = indexer.ensure_fresh(base_dir, return_docs=True)` 直接取得 `all_docs`，不再重複執行第二次 `read_knowledge_base(base_dir) + read_cold_notes(base_dir)`。
 
-- [ ] **Step 4: 執行全部單元測試驗證通過**
+- [x] **Step 4: 執行全部單元測試驗證通過**
 
 Run:
 ```powershell
@@ -497,8 +497,8 @@ Expected: All tests pass (`OK`).
     ```
     只將最相關的前 3 筆 `## 🔧` 經驗條目載入 Context。
 
-- [ ] **Step 1: 修改 `skills/deep-memory/SKILL.md` Step 3 與 `docs/rag-technology.md`**
-- [ ] **Step 2: 執行真實環境端到端基準實測（End-to-End Benchmark）**
+- [x] **Step 1: 修改 `skills/deep-memory/SKILL.md` Step 3 與 `docs/rag-technology.md`**
+- [x] **Step 2: 執行真實環境端到端基準實測（End-to-End Benchmark）**
 
 Run:
 ```powershell
@@ -513,3 +513,23 @@ Measure-Command {
 Expected:
 - 向量庫總筆數從 `7,836` 筆精簡為約 `3,334` 筆（3,107 筆熱庫 + 227 筆待精煉 `raw` 冷庫）。
 - `ensure_fresh` + `search.py` 總耗時由原本的 **36.8 秒** 降至 **12～16 秒** 內。
+
+---
+
+## 五、實作結果（2026-10-26）
+
+已合併至 main（`3e404f1`、`16f584f`、`6d1580e`，merge `69b4bbf`）。
+
+| 項目 | 計畫目標 | 實測 |
+|---|---|---|
+| 向量庫筆數 | 約 3,334 | 3,351（刪 4,502 筆、零重算、未觸發異常警告） |
+| `ensure_fresh`（零變動） | 約 1.2 秒 | 1.3～2.0 秒 |
+| 單次查詢（索引最新） | 12～16 秒 | 本機約 29～40 秒；開啟 Jev 約 20～22 秒 |
+
+- **基準不同**：實作當天同一台機器的基準是 57.6 秒（計畫寫 36.8 秒），且背景 CPU 約 65%、時脈 1.2 GHz，絕對秒數偏高；未達 12～16 秒的主因是本機重排推論在此負載下 10 筆要 10～17 秒。
+- **與計畫不同之處**：
+  - v1 遷移改以 `include_reviewed=True` 的全量冷庫配對（否則精煉過的舊庫配對率跌破五成而中止）；stale 刪除分批 500。
+  - 截斷預設採 800 字（計畫架構段寫 600）；400 字實測 60 筆中 18 筆跨 0.35 門檻，不採用。
+  - 追加：重排分數快取（鍵含重排器）、E5 以 `get_shared_e5()` 在補索引與查詢間共用、`refine_prepare` 共用 E5 與重排設定。
+  - 追加：可選的 TypeSafe Jev 雲端重排（`jev_reranker.py`、`config.json` 開關、門檻 0.6、失敗退回本機）；26 查詢 149 筆盲標 P@1 0.77 → 0.85、P@3 0.58 → 0.67。
+- **評估後不採用**：reranker int8 量化（分數最大偏移 0.28）、ORT 優化圖快取與背景載入（0～1.5 秒）、調整執行緒數（預設最快）、常駐服務（約 2.3 GB，查詢中位間隔 41 分鐘）。
