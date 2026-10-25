@@ -1080,7 +1080,7 @@ const T = {
     
     features_card3_tag: "Offline Search",
     features_card3_title: "本機 RAG 混合檢索",
-    features_card3_desc: "整合本機 ChromaDB 向量檢索與 BM25 關鍵字檢索，並經由 CPU 進行重排（Rerank）。推論改採 ONNX Runtime 輕量引擎——不需 PyTorch，索引更新約 1 秒、完整檢索約 7 秒，安裝體積從 3 GB 縮至 200 MB。無須連接外部雲端資料庫，確保您的代碼隱私安全。",
+    features_card3_desc: "整合本機 ChromaDB 向量檢索與 BM25 關鍵字檢索，並經由 CPU 進行重排（Rerank）。推論改採 ONNX Runtime 輕量引擎——不需 PyTorch，索引更新約 1 秒、完整檢索約 7 秒，安裝體積從 3 GB 縮至 200 MB。無須連接外部雲端資料庫；未開啟可選的 Jev 雲端重排時，資料全程不離開本機。",
     
     features_card4_tag: "Sync & Backup",
     features_card4_title: "跨系統同步與安全備份",
@@ -1135,7 +1135,7 @@ const T = {
     jev_title: "啟用 Jev 雲端重排",
     jev_desc: "預設整條檢索都在本機執行，由 bge-reranker 在 CPU 上重排。開啟 TypeSafe Jev 後改由雲端平行評分：10 筆候選約 1.6 秒（本機需載入約 9 秒、推論 10～17 秒）。在 26 個查詢、149 筆盲標的評測中，第 1 名命中率從 0.77 升到 0.85，前 3 名精確率從 0.58 升到 0.67。",
     jev_s1_title: "設定 API 金鑰",
-    jev_s1_desc: "到 TypeSafe（docs.typesafe.ai）取得 API 金鑰，存成使用者層級環境變數 TYPESAFE_API_KEY，或寫在 ~/.deep-memory/.env。",
+    jev_s1_desc: "到 TypeSafe（typesafe.ai）取得 API 金鑰，存成使用者層級環境變數 TYPESAFE_API_KEY，或寫在 ~/.deep-memory/.env。",
     jev_s1_alt: "或寫進 ~/.deep-memory/.env",
     jev_s1_note: "環境變數在程式啟動時讀取，設定後要重開終端機與 IDE（VS Code、Claude Code）。金鑰不要放進 config.json 或任何 repo。",
     jev_s2_title: "在設定檔開啟 Jev",
@@ -1204,7 +1204,7 @@ const T = {
     
     features_card3_tag: "Offline Search",
     features_card3_title: "Local hybrid retrieval",
-    features_card3_desc: "Combines ChromaDB vector search with BM25 keyword matching, reranked locally on CPU. Inference runs on the lightweight ONNX Runtime — no PyTorch required: index updates in ~1s, full retrieval in ~7s, and the install footprint shrinks from 3 GB to 200 MB. No external cloud connections needed, keeping your code fully private.",
+    features_card3_desc: "Combines ChromaDB vector search with BM25 keyword matching, reranked locally on CPU. Inference runs on the lightweight ONNX Runtime — no PyTorch required: index updates in ~1s, full retrieval in ~7s, and the install footprint shrinks from 3 GB to 200 MB. No external cloud database needed; unless you turn on the optional Jev cloud re-ranker, your data never leaves the machine.",
     
     features_card4_tag: "Sync & Backup",
     features_card4_title: "Cross-system sync & safe backup",
@@ -1259,7 +1259,7 @@ const T = {
     jev_title: "Enable the Jev Cloud Re-ranker",
     jev_desc: "By default the whole retrieval pipeline runs locally, with bge-reranker re-ranking on the CPU. Turn on TypeSafe Jev and candidates are scored in the cloud in parallel: about 1.6 s for 10 candidates, versus ~9 s of model loading plus 10–17 s of inference locally. In a 26-query, 149-label blind evaluation, top-1 precision rose from 0.77 to 0.85 and top-3 precision from 0.58 to 0.67.",
     jev_s1_title: "Set your API key",
-    jev_s1_desc: "Get an API key from TypeSafe (docs.typesafe.ai) and store it as the user-level environment variable TYPESAFE_API_KEY, or put it in ~/.deep-memory/.env.",
+    jev_s1_desc: "Get an API key from TypeSafe (typesafe.ai) and store it as the user-level environment variable TYPESAFE_API_KEY, or put it in ~/.deep-memory/.env.",
     jev_s1_alt: "or put it in ~/.deep-memory/.env",
     jev_s1_note: "Environment variables are read at process start, so reopen your terminal and IDE (VS Code, Claude Code) after setting it. Never put the key in config.json or any repo.",
     jev_s2_title: "Turn Jev on in the config file",
@@ -1374,7 +1374,7 @@ class Component extends DCLogic {
         { icon: '🔁', title: this.state.lang === 'zh' ? '自動精煉與沉澱' : 'Genuinely Gets Stronger', desc: this.state.lang === 'zh' ? '每回合自動分析對話關鍵字與主題。當偵測到您正在使用特定工具或遇到已知問題時，主動載入過去踩坑紀錄與最佳實踐參數，防止重複開發。' : 'Checks a keyword index every turn — if it recognizes a problem it has solved before, it recalls the best solution or pitfall guide directly.' },
         { icon: '🧩', title: this.state.lang === 'zh' ? '跨技能經驗共享' : 'Cross-Skill Memory', desc: this.state.lang === 'zh' ? '當觸發 any 輔助技能時，Deep-Memory 會強制檢索該技能的歷史操作經驗，對常見的 API 版本衝突、參數失效及認證過期發出主動警告。' : 'Whenever another skill is invoked, Deep-Memory checks its skill experience store and proactively warns about past pitfalls.' },
         { icon: '✍️', title: this.state.lang === 'zh' ? '自動精煉與沉澱' : 'Proactive Experience Capture', desc: this.state.lang === 'zh' ? '冷資料經過精煉後，轉化為結構化的 .md 知識庫與技能踩坑日誌，由本機向量檢索快速配對，直接注入 Agent 上下文。' : 'When a task is completed well, the AI proactively offers to record what worked — no manual note-taking required.' },
-        { icon: '📦', title: this.state.lang === 'zh' ? '本機 RAG 混合檢索' : 'Modular Skill Packaging', desc: this.state.lang === 'zh' ? '整合本機 ChromaDB 向量檢索與 BM25 關鍵字檢索，並經由 CPU 進行重排（Rerank）。無須連接外部雲端資料庫，確保您的代碼隱私安全。' : 'Private data is fully separated from code. Local hybrid retrieval combines semantic search with BM25 and CPU-based reranking.' },
+        { icon: '📦', title: this.state.lang === 'zh' ? '本機 RAG 混合檢索' : 'Modular Skill Packaging', desc: this.state.lang === 'zh' ? '整合本機 ChromaDB 向量檢索與 BM25 關鍵字檢索，並經由 CPU 進行重排（Rerank）。無須連接外部雲端資料庫；未開啟可選的 Jev 雲端重排時，資料全程不離開本機。' : 'Private data is fully separated from code. Local hybrid retrieval combines semantic search with BM25 and CPU-based reranking.' },
         { icon: '🔐', title: this.state.lang === 'zh' ? '跨系統同步與安全備份' : 'Safe Cross-Device Backup', desc: this.state.lang === 'zh' ? '支援 Windows、macOS 與 Linux 跨系統同步。自動解決路徑與環境變數差異，並可一鍵備份至 GitHub 私人倉庫，防範任何因系統崩潰造成的記憶遺失。' : 'Push your knowledge base to your own private GitHub repo, then restore it safely on a new machine without ever overwriting existing files.' },
       ],
       steps: [

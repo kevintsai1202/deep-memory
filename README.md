@@ -28,7 +28,7 @@ You don't need to take notes by hand. When the AI detects that a task has been c
 
 ### 4. Modular Skill Packaging & RAG Integration
 - **Separation of concerns**: private data folders and binary files are completely removed from the package; the code ships independently.
-- **Local hybrid retrieval**: integrates the `chroma-hybrid-search` sub-skill for local semantic + BM25 hybrid search, with CPU-based BGE-Reranker-base re-ranking.
+- **Local hybrid retrieval**: integrates the `chroma-hybrid-search` sub-skill for local semantic + BM25 hybrid search, with CPU-based BGE-Reranker-base re-ranking. You can switch to the TypeSafe Jev cloud re-ranker in `~/.deep-memory/config.json` (faster and more accurate, but the query and candidate snippets are sent to TypeSafe; see `skills/chroma-hybrid-search/SKILL.md`).
 - **Hot/cold tiered storage**: frequently-used curated knowledge lives in the hot store (`knowledge-base/`, `experience/`); fresh, unrefined conversation notes land first in the cold store (`cold-notes/raw.jsonl`) and get refined into hot-store entries once enough accumulate.
 
 ### 5. Cross-Device Portability & Safe Backup

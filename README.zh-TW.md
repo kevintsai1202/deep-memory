@@ -32,7 +32,7 @@ Deep‑Memory 是一個為 AI Assistant 設計的元技能（Meta‑Skill）。�
 ### 4. 模組化技能封裝與 RAG 整合
 
 - **職責分離**：完全移除了私有資料夾與二進位檔案，程式碼獨立打包發布。
-- **本機混合檢索**：整合子技能 `chroma-hybrid-search`，提供本地語意 + BM25 混合檢索，並藉由 CPU 運行 BGE-Reranker-base 重排。
+- **本機混合檢索**：整合子技能 `chroma-hybrid-search`，提供本地語意 + BM25 混合檢索，並藉由 CPU 運行 BGE-Reranker-base 重排。也可在 `~/.deep-memory/config.json` 改用 TypeSafe Jev 雲端重排（較快、較準，但查詢與候選片段會送到 TypeSafe；設定方式見 `skills/chroma-hybrid-search/SKILL.md`）。
 - **冷熱分層儲存**：高頻取用的精選知識存於熱庫（`knowledge-base/`、`experience/`），即時但未精煉的對話筆記先落地冷庫（`cold-notes/raw.jsonl`），累積到一定量再精煉升級為熱庫條目。
 
 ### 5. 跨裝置可攜與安全備份

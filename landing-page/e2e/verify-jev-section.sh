@@ -61,7 +61,8 @@ agent-browser wait --load networkidle
 check_lang zh "啟用 Jev 雲端重排"
 check_lang en "Enable the Jev Cloud Re-ranker"
 
-# 桌面截圖：捲到 #jev
+# 桌面截圖：高視窗一次容納整個 #jev 段落（四張卡片與隱私提醒），捲到段落開頭
+agent-browser set viewport 1440 2000
 agent-browser eval "localStorage.setItem('lang','zh'); location.reload(); 'ok'" >/dev/null
 agent-browser wait --load networkidle
 agent-browser eval "document.querySelector('#jev').scrollIntoView(); 'ok'" >/dev/null
