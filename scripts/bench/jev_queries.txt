@@ -1,0 +1,28 @@
+# Jev 重排擴大評測用查詢（2026-10-25）：依 knowledge-base 分類挑選，涵蓋開發、部署、維運、法律、媒體、AI 工具
+# 前 6 個與第一輪相同，便於對照；最後 3 個刻意寫得籠統，用來觀察 Jev 是否過於寬鬆
+RAG 檢索效能優化 indexer reranker
+Playwright e2e 腳本放置與重跑
+PowerShell 長時指令 tee log 判斷卡死
+Agile PLM BOM 查詢 SQL
+Spring Boot Flyway migration 失敗
+Jev 中文斷句 Noul 切點
+mini-plm Oracle 相容性 ORA-00932
+Zeabur 部署 port 對不上 服務起不來
+Cloudflare Tunnel 自架 named tunnel 設定
+SPA 部署後使用者看到舊版 快取
+SPF DKIM DMARC 信件進垃圾桶
+taidoc-helpdesk 意圖分類 關鍵字撞字
+Claude Code MCP server 加到 user scope
+ffmpeg filter_complex 記憶體峰值過高
+PostgreSQL 權限錯誤 42501
+Java 8 與 JDK 21 切換 mvn 編譯失敗
+TipTop SOAP 整合 ActingAs 驗證
+訴訟救助 選任律師 條件
+git-filter-repo 去識別化 改寫歷史
+mini-plm 催簽排程 lost update 重複寄送
+Google OAuth 同意畫面 品牌驗證
+Agile SDK AgileSessionFactory 連線錯誤
+deep-memory 冷庫精煉流程
+部署後頁面 404
+單元測試全過但實際功能沒作用
+怎麼加快開發速度

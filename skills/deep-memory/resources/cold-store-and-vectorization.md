@@ -67,7 +67,7 @@
 Cold-store entries are keyed by a semantic hash (`cold-notes#<hash12>`) covering `topic` / `content` / `tags` / `skill` / `memory_type` — **not** by line number, and deliberately **excluding** `date` / `time` / `project` / `quality` and every template string. Consequences worth knowing:
 
 - Deleting or inserting a line anywhere in `raw.jsonl` does **not** re-embed the entries after it. Measured on a 928-line store: removing the middle line re-embedded **0** entries — the 463 entries below it only had their `line` metadata refreshed, at zero embedding cost.
-- Marking an entry `quality: reviewed` during refinement does **not** trigger a re-embed, because `quality` is outside the hash.
+- Marking an entry `quality: reviewed` during refinement does **not** trigger a re-embed, because `quality` is outside the hash. It does drop the entry from search: `reviewed` cold notes are excluded from the index by default (refined ones already live in the hot store; skipped ones were judged not worth keeping), and the next sync deletes their vectors at zero embedding cost.
 - Changing how the indexed text is assembled does **not** invalidate the whole store.
 
 The line number survives as `line` in metadata and is returned with every cold-store search hit, so results stay traceable to their source line.
@@ -95,32 +95,53 @@ Entries written since the last index run are no longer a staleness problem: `sea
 
 | Trigger | Reason |
 |---|---|
-| `cold-notes/raw.jsonl` has ≥ **20 entries** | Enough raw material has accumulated for meaningful distillation |
+| `cold-notes/raw.jsonl` has ≥ **30 pending entries** (quality ≠ `reviewed`) | Enough raw material for a small, fast batch; `write_cold.py` prints the pending count and hints at this threshold — the total line count is not a trigger |
 | A single `tags` or `skill` value appears ≥ **3 times** | High-frequency topic indicates a generalizable pattern worth promoting to the hot store |
 | User explicitly says "refine the cold store" | Explicit refinement command |
 | User explicitly says "refine experience" / 「精煉經驗」 / 「修正經驗庫」 | Route `memory_type=experience` notes into the cross-skill experience store |
 
 ### Refinement Workflow
 
-1. **Read the cold store**: Agent reads all entries from `cold-notes/raw.jsonl`
-2. **Cluster analysis**: Group by `memory_type`, `tags`, and `skill` fields to identify recurring themes
-3. **Draft hot store entries**: For each high-frequency cluster, generate a structured MD draft:
-   ```markdown
-   ## 🔧 [Distilled pattern title]
-   **Date:** YYYY-MM-DD (refinement date)
-   **Context:** One sentence describing the applicable scenario
-   **Best Practices:**
-   - [Key takeaway distilled from multiple cold store entries]
-   **Source cold store entries:** cold-notes/raw.jsonl#L3, L7, L12
+Refinement is tool-assisted: two scripts do the deterministic work so the LLM only reads, judges, and writes drafts.
+A 184-entry batch done the old way (one agent reading everything and grepping the hot store per cluster) took ~15 minutes;
+the time went into tool round-trips, output drafting, and judging skips one by one — not into indexing (7 s).
+
+1. **Prepare work packs (no LLM)** — run from the venv so it can find hot-store candidates:
+   ```bash
+   <PY> skills/deep-memory/scripts/refine_prepare.py            # optional: --since YYYY-MM-DD --project <name> --max-pack 25
    ```
-4. **Ask for user confirmation**:
-   > "I've organized [N] entries on [topic] from the cold store. Here's the distilled draft — shall I write this to the hot store?"
-5. **Write to hot store** after confirmation — update the corresponding MD file and `_index.json`
-   - `memory_type=knowledge` → write to `knowledge-base/[category].md`
-   - `memory_type=experience` → write to `experience/skill-[skill-id].md`
-   - `memory_type=both` → split into one general knowledge entry and one skill-specific experience entry
-6. **Mark cold store entries**: Tag refined entries with `"quality": "reviewed"` (do not delete — preserve history)
-7. **Rebuild the index and spot-check (verification — refinement is NOT complete without this)**:
+   It reads pending entries (quality ≠ `reviewed`) with their line numbers, groups them by project + theme
+   (skill, or the first tag when the skill is generic), puts near-duplicate notes into the same pack and flags them
+   (`⚠️ 可能重複`), and lists each entry's top-3 existing hot-store entries from the hybrid index plus a suggested target file.
+   Output: `<workspace>/refine-work/<run-id>/pack-NN.md` + `manifest.json` (every pending line with a content hash).
+   Candidates are ranked by vector + BM25 fusion and scored by vector similarity (fast: ~1 minute of model loading plus
+   well under a second per entry). `--rerank` re-orders the top 5 with the cross-encoder (truncated text) for sharper
+   ranking at ~2–3 s per entry — full-text reranking measured 1–2 s per pair and is deliberately not used. When
+   `<workspace>/config.json` selects the Jev re-ranker (see chroma-hybrid-search), `--rerank` uses Jev instead (first
+   800 chars, strong-match threshold 0.6) and falls back to the local cross-encoder on a missing key or any error.
+   Without the venv, add `--no-candidates` (standard library only; no duplicate-candidate lookup).
+2. **Draft in parallel** — dispatch one subagent per pack **at the same time**. Each reads only its own `pack-NN.md`
+   (the draft format contract is at the top of every pack) and writes `pack-NN.drafts.md` next to it:
+   `### TARGET:` new entries, `### APPEND-TO: <file> :: <existing title>` additions, `### NEW CATEGORY:` only when nothing fits,
+   optional `## KEYWORDS`, and a mandatory `## REVIEWED` list covering **every** line in the pack
+   (`L123 | promoted→<file>` or `L124 | skipped: <reason>` — skips are one line, never prose).
+   Hand subagents the pack path, not the cold store; they must not read `raw.jsonl`.
+3. **Preview and ask for confirmation**:
+   ```bash
+   python skills/deep-memory/scripts/refine_apply.py --work-dir <workspace>/refine-work/<run-id> --dry-run
+   ```
+   Show the user the summary (entries added, appends, new categories, lines to mark) and ask before writing.
+4. **Apply** (standard library only):
+   ```bash
+   python skills/deep-memory/scripts/refine_apply.py --work-dir <workspace>/refine-work/<run-id>
+   ```
+   It validates everything before writing anything: REVIEWED must cover every manifest line (`--allow-partial` to override),
+   each line's content hash must still match (guards against line shifts), APPEND-TO titles and TARGET files must exist
+   (knowledge-base files are created only via NEW CATEGORY; `experience/skill-*.md` may be created and is indexed automatically).
+   Touched files are backed up to `<work-dir>/backup/` first. Refined **and skipped** entries are marked `"quality": "reviewed"`
+   (never deleted — history is preserved).
+5. **Refine small and often**: 30–50 pending entries per run keeps every pack small and the whole run to a few minutes.
+6. **Rebuild the index and spot-check (verification — refinement is NOT complete without this)**:
    run `update_db.py` to re-index, then verify retrieval with a `search.py` query using
    keywords from at least one newly written hot-store entry:
 

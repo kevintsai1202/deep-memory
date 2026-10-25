@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest import mock
 
 import chromadb
+from chromadb.api.models.Collection import Collection
 
 import indexer
 import kb_reader
@@ -409,6 +410,89 @@ class TestSyncPartialMigrationWiring(unittest.TestCase):
         self.assertEqual(result["embedded"], 0)
         self.assertEqual(result["backfilled"], 1)
         self.assertEqual(result["skipped"], 2)
+
+
+class TestSyncSingleGetOptimization(unittest.TestCase):
+    """sync() 在已是最新 schema 時只能讀一次 collection 快照，並可回傳 docs 供 search.py 複用。
+
+    7,800 筆規模下每次 collection.get(include=["metadatas"]) 約 2 秒，
+    原本一次 sync 會讀 5 次；這裡用計數守住「只讀 1 次」，避免日後有人
+    在 assert/detect/build_plan 任一處又自己補一次 get。
+    """
+
+    def test_sync_calls_collection_get_only_once_when_up_to_date(self):
+        workspace = tempfile.mkdtemp()
+        kb_dir = os.path.join(workspace, "knowledge-base")
+        os.makedirs(kb_dir)
+        with open(os.path.join(kb_dir, "demo.md"), "w", encoding="utf-8") as f:
+            f.write("# 標題\n\n## 🔧 條目一\n" + ("內容測試文字。" * 25))
+
+        hot_doc = kb_reader.read_knowledge_base(workspace)[0]
+        db_path = os.path.join(workspace, "chroma_hybrid_db")
+        client = chromadb.PersistentClient(path=db_path)
+        col = client.get_or_create_collection("hybrid_docs")
+        col.upsert(
+            ids=[hot_doc["path"]],
+            embeddings=[[0.1, 0.2]],
+            documents=[hot_doc["text"]],
+            metadatas=[indexer.build_metadata(hot_doc)],
+        )
+
+        # 監控 collection.get 被呼叫的次數
+        orig_get = Collection.get
+        call_count = {"n": 0}
+
+        def counted_get(self_col, *args, **kwargs):
+            call_count["n"] += 1
+            return orig_get(self_col, *args, **kwargs)
+
+        with mock.patch.object(Collection, "get", counted_get):
+            result, docs = indexer.ensure_fresh(workspace, verbose=False, return_docs=True)
+
+        self.assertEqual(call_count["n"], 1, f"預期只呼叫 1 次 collection.get，實際呼叫了 {call_count['n']} 次")
+        self.assertEqual(result["skipped"], 1)
+        self.assertEqual([d["path"] for d in docs], [hot_doc["path"]])
+
+    def test_ensure_fresh_returns_none_pair_on_failure_when_return_docs(self):
+        # search.py 以 docs is None 判斷要不要自己讀檔，失敗時必須回傳可拆包的 (None, None)
+        with mock.patch.object(indexer, "sync", side_effect=RuntimeError("模擬索引失敗")):
+            with contextlib.redirect_stdout(io.StringIO()):
+                result, docs = indexer.ensure_fresh("/nonexistent", return_docs=True)
+        self.assertIsNone(result)
+        self.assertIsNone(docs)
+
+
+class TestSyncMigrationKeepsReviewedMatches(unittest.TestCase):
+    """v1 遷移必須以「含 reviewed 的全量冷庫」配對舊向量。
+
+    read_cold_notes 預設略過 reviewed；若遷移也用過濾後的清單，精煉過的
+    舊庫（reviewed 常佔九成以上）配對率會跌破五成而中止遷移。
+    """
+
+    def test_legacy_reviewed_entry_migrates_then_gets_cleaned(self):
+        workspace = tempfile.mkdtemp()
+        cold_dir = os.path.join(workspace, "cold-notes")
+        os.makedirs(cold_dir)
+        entry = {"topic": "已精煉", "date": "2026-08-01", "skill": "general",
+                 "tags": [], "content": "內容", "memory_type": "knowledge",
+                 "quality": "reviewed"}
+        with open(os.path.join(cold_dir, "raw.jsonl"), "w", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+        reviewed_doc = kb_reader.read_cold_notes(workspace, include_reviewed=True)[0]
+        db_path = os.path.join(workspace, "chroma_hybrid_db")
+        col = chromadb.PersistentClient(path=db_path).get_or_create_collection("hybrid_docs")
+        col.upsert(ids=["cold-notes/raw.jsonl#L1"], embeddings=[[0.1, 0.2]],
+                   documents=[reviewed_doc["text"]],
+                   metadatas=[{"path": "cold-notes/raw.jsonl#L1", "source": "cold"}])
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = indexer.sync(workspace, trigger="test", verbose=False)
+
+        # 遷移成功（未拋出），且 reviewed 條目在遷移後被當成孤立向量清掉
+        self.assertEqual(result["stale"], 1)
+        self.assertEqual(result["embedded"], 0)
+        self.assertEqual(col.count(), 0)
 
 
 class TestRunLog(unittest.TestCase):

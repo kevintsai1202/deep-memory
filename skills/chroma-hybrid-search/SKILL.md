@@ -54,7 +54,7 @@ Run `update_db.py` explicitly only to index new entries immediately rather than 
 Cold-store entries are keyed by a semantic hash — `cold-notes#<hash12>` — not by line number. The hash covers `topic` / `content` / `tags` / `skill` / `memory_type` and deliberately excludes `date` / `time` / `project` / `quality` and every template string. So:
 
 - Deleting or inserting a line anywhere in `raw.jsonl` does **not** re-embed the entries after it. Measured on a 928-line store: removing the middle line re-embedded **0** entries — the 463 entries after it only had their `line` metadata refreshed, at zero embedding cost.
-- Marking an entry `quality: reviewed` during refinement does **not** trigger a re-embed.
+- Marking an entry `quality: reviewed` during refinement does **not** trigger a re-embed. It removes the entry from the index instead: `read_cold_notes()` skips `reviewed` entries by default (their content already lives in the hot store), so the next sync deletes their vectors at zero embedding cost. `read_cold_notes(..., include_reviewed=True)` still reads the full history.
 - Changing how the indexed text is assembled does **not** invalidate the store.
 
 The line number survives in metadata as `line` and is returned with every cold-store hit, so results stay traceable to their source line.
@@ -85,6 +85,8 @@ Best for complex questions requiring deep semantic understanding:
 
 Always pass `--min-score 0.35` in this mode — besides filtering noise, it lets the project-first pass fall back to the full cross-project store when the current project only has low-relevance hits (without it, a near-zero-score project hit still counts as "found something" and blocks the fallback).
 
+`--rerank-max-chars` (default `800`, `0` = no truncation) caps how much of each candidate is sent to the re-ranker; returned `text` is always the full entry. Keep the default: 400 pushed 18 of 60 measured candidates across the 0.35 threshold.
+
 ### 2. Vector Similarity Search Only
 Best for cross-language or fuzzy semantic search:
 ```bash
@@ -106,20 +108,38 @@ Cold-store entries carry `skill`, `tags`, and `memory_type` metadata; `experienc
 ```
 Plain `knowledge-base/*.md` category files have no single skill/tag (they mix many topics), so they're never included by `--skill` or `--tag` filters unless the indexed entry explicitly has that metadata; they do participate in `--memory-type knowledge`.
 
+### 5. Optional Cloud Re-ranker (TypeSafe Jev)
+The default re-ranker is local `bge-reranker-base`. You can switch to TypeSafe Jev, which scores each candidate with a yes/no question in about 1.6 s per query, compared with 10–17 s plus ~9 s model load locally. In a 26-query, 149-label evaluation, Jev scored P@1 0.85 vs 0.77 and P@3 0.67 vs 0.58. **Trade-off:** the query and the first `--rerank-max-chars` characters of each candidate (≤10 per pass) are sent to `api.typesafe.ai`. Leave it off for stores that must not leave the machine.
+
+| Setting | Where | Notes |
+|---|---|---|
+| Provider | `<workspace>/config.json` → `{"reranker": {"provider": "jev", "jev": {"model": "jev-1.14.0", "min_score": 0.6, "timeout": 10, "concurrency": 10}}}` | Persistent; `jev` keys are optional (those are the defaults) |
+| Per-shell override | `DEEP_MEMORY_RERANKER=local\|jev` | Beats the config file |
+| Per-call override | `--reranker local\|jev` | Beats everything |
+| API key | User environment variable `TYPESAFE_API_KEY` (or `JEV_API_KEY`), or a `<workspace>/.env` line | Never in `config.json` or the repo; `.env` and `config.json` sit outside the backup scope |
+
+- With Jev active, the threshold is `jev.min_score` (default **0.6**, the evaluated equivalent of bge's 0.35); `--min-score` applies to the local re-ranker only. Keep passing `--min-score 0.35`; it is what a fallback uses.
+- Any Jev failure (missing key, timeout, HTTP error) logs a warning to stderr and re-scores that pass locally; later passes in the same query skip Jev. Search never fails because of Jev.
+- The model version is pinned (`jev-1.14.0`) because the `jev-latest` alias moves without notice and the threshold was measured on 1.14.0. Re-run `scripts/bench/jev_rerank_eval.py` before changing the model or question.
+
 ---
 
 ## 📋 Output Format
 
-The script outputs a standard JSON array. `path` for hot-store hits is `file.md#entry-slug` — one `## 🔧` entry, not the whole file (see "Entry-Level Chunking" below). **Use the `text` field directly as context — do not separately open the file at `path` with the Read tool.** Stripping the `#entry-slug` and reading the whole source file re-introduces exactly the whole-file dilution chunking exists to avoid; `path` is for citation (telling the user where a fact came from), not an instruction to read further.
+The script outputs `{"scope": ..., "reranker": ..., "results": [...]}`. `reranker` tells you which scale `rerank_score` is on: `jev`, `local`, `local (jev fallback: <reason>)`, or `none` (non-rerank modes). `path` for hot-store hits is `file.md#entry-slug` — one `## 🔧` entry, not the whole file (see "Entry-Level Chunking" below). **Use the `text` field directly as context — do not separately open the file at `path` with the Read tool.** Stripping the `#entry-slug` and reading the whole source file re-introduces exactly the whole-file dilution chunking exists to avoid; `path` is for citation (telling the user where a fact came from), not an instruction to read further.
 
 ```json
-[
-  {
-    "path": "experience/skill-remotion-best-practices.md#fps-30-causes-av-desync",
-    "rerank_score": 0.9402,
-    "text": "## 🔧 FPS 30 causes A/V desync\n**Date:** ...\n(just this one entry, not the rest of the file)"
-  }
-]
+{
+  "scope": "project:deep-memory",
+  "reranker": "jev",
+  "results": [
+    {
+      "path": "experience/skill-remotion-best-practices.md#fps-30-causes-av-desync",
+      "rerank_score": 0.9402,
+      "text": "## 🔧 FPS 30 causes A/V desync\n**Date:** ...\n(just this one entry, not the rest of the file)"
+    }
+  ]
+}
 ```
 
 ## ✂️ Entry-Level Chunking

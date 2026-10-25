@@ -32,7 +32,7 @@ Deep‑Memory 是一個為 AI Assistant 設計的元技能（Meta‑Skill）。�
 ### 4. 模組化技能封裝與 RAG 整合
 
 - **職責分離**：完全移除了私有資料夾與二進位檔案，程式碼獨立打包發布。
-- **本機混合檢索**：整合子技能 `chroma-hybrid-search`，提供本地語意 + BM25 混合檢索，並藉由 CPU 運行 BGE-Reranker-base 重排。
+- **本機混合檢索**：整合子技能 `chroma-hybrid-search`，提供本地語意 + BM25 混合檢索，並藉由 CPU 運行 BGE-Reranker-base 重排。也可在 `~/.deep-memory/config.json` 改用 TypeSafe Jev 雲端重排（較快、較準，但查詢與候選片段會送到 TypeSafe；設定方式見 `skills/chroma-hybrid-search/SKILL.md`）。
 - **冷熱分層儲存**：高頻取用的精選知識存於熱庫（`knowledge-base/`、`experience/`），即時但未精煉的對話筆記先落地冷庫（`cold-notes/raw.jsonl`），累積到一定量再精煉升級為熱庫條目。
 
 ### 5. 跨裝置可攜與安全備份
@@ -183,6 +183,12 @@ npx skills add kevintsai1202/deep-memory --skill deep-memory -a claude-code -g
 ---
 
 ## Changelog
+
+### 2026-09-23
+
+- 新增 `refine_prepare.py`：精煉前先把待精煉冷庫條目依專案＋主題分包、標註近似重複、用混合檢索列出每筆最相近的 3 條熱庫條目與建議目標檔，讓多個子代理平行起草，不必由單一代理讀完整個冷庫再逐群 grep 熱庫（實測 184 筆舊流程約 15 分鐘）。
+- 新增 `refine_apply.py`：依固定草稿格式（TARGET／APPEND-TO／NEW CATEGORY／KEYWORDS／REVIEWED）套用到熱庫；寫入前驗證行號涵蓋、內容雜湊、目標存在，先備份，支援 `--dry-run`。
+- `write_cold.py` 的精煉提示改看「待精煉筆數」（≥ 30），不再因冷庫總數每寫一筆就提示。
 
 ### 2026-07-08
 

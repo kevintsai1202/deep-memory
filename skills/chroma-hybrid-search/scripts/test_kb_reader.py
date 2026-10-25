@@ -105,6 +105,24 @@ class TestDocsCarryContentHash(unittest.TestCase):
         self.assertEqual(docs[0]["path"], f"cold-notes#{docs[0]['content_hash']}")
         self.assertEqual(docs[0]["line"], 1)
 
+    def test_read_cold_notes_skips_reviewed_by_default_and_preserves_line_numbers(self):
+        """預設應略過 quality=='reviewed' 的冷庫筆記，且未精煉筆記的 line 必須維持原始檔案行號"""
+        ws = self._workspace()
+        lines = [
+            json.dumps({"date": "2026-08-01", "topic": "已精煉一", "content": "c1", "quality": "reviewed"}, ensure_ascii=False),
+            json.dumps({"date": "2026-08-02", "topic": "待精煉二", "content": "c2", "quality": "raw"}, ensure_ascii=False),
+            json.dumps({"date": "2026-08-03", "topic": "無標記三", "content": "c3"}, ensure_ascii=False),
+        ]
+        (ws / "cold-notes" / "raw.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+        # 預設只讀出第 2、3 行，且行號必須是 2 與 3（不能因為第 1 行被跳過就變成 1 與 2）
+        docs_default = kb_reader.read_cold_notes(ws)
+        self.assertEqual([d["line"] for d in docs_default], [2, 3])
+
+        # 明確指定 include_reviewed=True 時應讀出全部 3 行
+        docs_all = kb_reader.read_cold_notes(ws, include_reviewed=True)
+        self.assertEqual([d["line"] for d in docs_all], [1, 2, 3])
+
 
 if __name__ == "__main__":
     unittest.main()

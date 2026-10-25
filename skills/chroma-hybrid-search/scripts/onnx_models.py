@@ -66,17 +66,45 @@ class E5OnnxEmbeddingFunction:
         return emb.tolist()
 
 
+# 同一行程共用的 E5 實例（延遲載入）
+_SHARED_E5 = None
+
+
+def get_shared_e5():
+    """回傳同一行程共用的 E5 embedding function，首次呼叫才載入模型。
+
+    search.py 查詢前的自動補索引（indexer.sync）與查詢向量計算都需要 E5；
+    各自 new 一個會在「有新條目要補」時重複載入一次（約 6 秒），而每回合都會
+    寫冷庫，這種情況幾乎每次查詢都會發生。
+    """
+    global _SHARED_E5
+    if _SHARED_E5 is None:
+        _SHARED_E5 = E5OnnxEmbeddingFunction()
+    return _SHARED_E5
+
+
 class OnnxReranker:
     """bge-reranker-base 的 cross-encoder 重排器，介面對齊 CrossEncoder.predict"""
 
     def __init__(self):
         self.sess, self.tok = _load("BAAI/bge-reranker-base")
-        self.tok.enable_padding(pad_id=1, pad_token="<pad>")
+        # 不開批次 padding：候選長短不一時，一篇 512-token 長文會把同批短文全部
+        # pad 到 512，自注意力成本隨長度平方成長；改在 predict() 逐筆推論
+        self.tok.no_padding()
 
     def predict(self, pairs):
-        """輸入 [query, doc] 列表，回傳 sigmoid 後的相關性分數（同 CrossEncoder 預設行為）"""
+        """輸入 [query, doc] 列表，回傳 sigmoid 後的相關性分數（同 CrossEncoder 預設行為）。
+
+        逐筆推論、不做 padding。分數與整批推論相同（padding 位置本就被 attention mask 遮掉），
+        但長短混合時實測快約一倍（10 筆、800 字截斷：15.3s → 7.8s）。
+        """
+        if not pairs:
+            return np.array([], dtype=np.float64)
         encs = self.tok.encode_batch([(q, d) for q, d in pairs])
-        ids = np.array([e.ids for e in encs], dtype=np.int64)
-        mask = np.array([e.attention_mask for e in encs], dtype=np.int64)
-        logits = _run(self.sess, ids, mask).reshape(-1).astype(np.float64)
+        logits = []
+        for enc in encs:
+            ids = np.array([enc.ids], dtype=np.int64)
+            mask = np.array([enc.attention_mask], dtype=np.int64)
+            logits.append(float(_run(self.sess, ids, mask).reshape(-1)[0]))
+        logits = np.array(logits, dtype=np.float64)
         return 1.0 / (1.0 + np.exp(-logits))
