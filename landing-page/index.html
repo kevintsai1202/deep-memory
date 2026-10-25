@@ -297,7 +297,41 @@
         }
 
         /* 響應式斷點設定 */
+        /* Jev 設定步驟：兩欄卡片，窄螢幕改單欄 */
+        .jev-steps {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 20px;
+        }
+
+        /* 格線子項預設 min-width:auto，長指令會把卡片撐寬；設 0 讓程式碼區塊在卡片內水平捲動 */
+        .jev-steps > .card {
+          min-width: 0;
+        }
+
+        .jev-code {
+          background: var(--bg-primary);
+          border: 1px solid var(--border-color);
+          border-radius: 8px;
+          padding: 12px 14px;
+          margin: 12px 0 0;
+          font-family: var(--font-mono);
+          font-size: 12px;
+          line-height: 1.6;
+          color: var(--text-primary);
+          white-space: pre;
+          overflow-x: auto;
+        }
+
+        .jev-code .c {
+          color: var(--text-muted);
+        }
+
         @media (max-width: 960px) {
+          .jev-steps {
+            grid-template-columns: 1fr;
+          }
+
           .bento-grid {
             grid-template-columns: 1fr;
           }
@@ -342,7 +376,8 @@
           <a href="#how" class="nav-link">{{t.nav_timeline}}</a>
           <a href="#features" class="nav-link">{{t.nav_features}}</a>
           <a href="#structure" class="nav-link">{{t.nav_pricing}}</a>
-          
+          <a href="#jev" class="nav-link">{{t.nav_jev}}</a>
+
           <div style="display: flex; gap: 8px; align-items: center; border-left: 1px solid var(--border-color); padding-left: 16px; margin-left: 8px;">
             <!-- Language toggle -->
             <button onclick="{{toggleLang}}" class="mono" style="background: none; border: 1px solid var(--border-color); color: var(--text-secondary); padding: 5px 9px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: 600; text-transform: uppercase; display: flex; align-items: center; justify-content: center; min-width: 42px; min-height: 24px;">
@@ -876,10 +911,91 @@
         </div>
       </div>
 
+      <!-- 可選的 Jev 雲端重排：啟用步驟與 API 金鑰設定 (Optional Jev Re-ranker) -->
+      <div id="jev" class="section section-border" style="max-width: 1100px; margin: 0 auto; padding: var(--section-padding) 32px; border-top: 1px solid var(--border-color);">
+        <div style="text-align: center; margin-bottom: 40px;">
+          <div class="mono" style="color: var(--brand-color); font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px;">{{t.jev_badge}}</div>
+          <h2 style="font-size: 38px; font-weight: 700; letter-spacing: -0.02em; margin: 0;">{{t.jev_title}}</h2>
+          <p style="color: var(--text-secondary); font-size: 15.5px; margin: 12px auto 0; max-width: 780px; line-height: 1.7;">{{t.jev_desc}}</p>
+        </div>
+
+        <div class="jev-steps">
+          <!-- 步驟 1：取得並設定 API 金鑰 -->
+          <div class="card">
+            <div class="mono" style="color: var(--brand-color); font-size: 12px; margin-bottom: 10px;">STEP 1</div>
+            <h3 style="font-size: 18px; font-weight: 600; margin: 0 0 8px; color: var(--text-primary);">{{t.jev_s1_title}}</h3>
+            <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.6; margin: 0;">{{t.jev_s1_desc}}</p>
+            <div class="jev-code"><span class="c"># Windows PowerShell</span>
+[Environment]::SetEnvironmentVariable('TYPESAFE_API_KEY', '&lt;your-key&gt;', 'User')
+
+<span class="c"># macOS / Linux (zsh)</span>
+echo 'export TYPESAFE_API_KEY=&lt;your-key&gt;' &gt;&gt; ~/.zshrc
+
+<span class="c"># {{t.jev_s1_alt}}</span>
+TYPESAFE_API_KEY=&lt;your-key&gt;</div>
+            <p style="color: var(--text-muted); font-size: 13px; line-height: 1.6; margin: 12px 0 0;">{{t.jev_s1_note}}</p>
+          </div>
+
+          <!-- 步驟 2：在設定檔開啟 Jev -->
+          <div class="card">
+            <div class="mono" style="color: var(--brand-color); font-size: 12px; margin-bottom: 10px;">STEP 2</div>
+            <h3 style="font-size: 18px; font-weight: 600; margin: 0 0 8px; color: var(--text-primary);">{{t.jev_s2_title}}</h3>
+            <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.6; margin: 0;">{{t.jev_s2_desc}}</p>
+            <div class="jev-code"><span class="c"># ~/.deep-memory/config.json</span>
+{
+  "reranker": {
+    "provider": "jev",
+    "jev": {
+      "model": "jev-1.14.0",
+      "min_score": 0.6,
+      "timeout": 10,
+      "concurrency": 10
+    }
+  }
+}</div>
+            <p style="color: var(--text-muted); font-size: 13px; line-height: 1.6; margin: 12px 0 0;">{{t.jev_s2_note}}</p>
+          </div>
+
+          <!-- 步驟 3：驗證 -->
+          <div class="card">
+            <div class="mono" style="color: var(--brand-color); font-size: 12px; margin-bottom: 10px;">STEP 3</div>
+            <h3 style="font-size: 18px; font-weight: 600; margin: 0 0 8px; color: var(--text-primary);">{{t.jev_s3_title}}</h3>
+            <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.6; margin: 0;">{{t.jev_s3_desc}}</p>
+            <div class="jev-code">&lt;PY&gt; skills/chroma-hybrid-search/scripts/search.py \
+  --query "your question" --limit 3 --min-score 0.35
+
+<span class="c"># {{t.jev_s3_expect}}</span>
+"reranker": "jev"</div>
+          </div>
+
+          <!-- 步驟 4：臨時切換與退回機制 -->
+          <div class="card">
+            <div class="mono" style="color: var(--brand-color); font-size: 12px; margin-bottom: 10px;">STEP 4</div>
+            <h3 style="font-size: 18px; font-weight: 600; margin: 0 0 8px; color: var(--text-primary);">{{t.jev_s4_title}}</h3>
+            <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.6; margin: 0;">{{t.jev_s4_desc}}</p>
+            <div class="jev-code"><span class="c"># {{t.jev_s4_c1}}</span>
+search.py --query "..." --reranker local
+
+<span class="c"># {{t.jev_s4_c2}}</span>
+$env:DEEP_MEMORY_RERANKER = "local"     <span class="c"># PowerShell</span>
+export DEEP_MEMORY_RERANKER=local       <span class="c"># bash / zsh</span></div>
+          </div>
+        </div>
+
+        <!-- 隱私與成本提醒 -->
+        <div style="margin-top: 24px; border: 1px solid rgba(16, 185, 129, 0.2); background: rgba(16, 185, 129, 0.04); border-radius: 12px; padding: 18px 22px; font-size: 14px; line-height: 1.7; color: var(--text-secondary);">
+          🔐 {{t.jev_privacy}}
+        </div>
+      </div>
+
       <!-- 更新紀錄 (Changelog) -->
       <div class="section" style="max-width: 760px; margin: 0 auto; padding: 0 32px 48px;">
         <div class="mono" style="color: var(--text-muted); font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 16px; text-align: center;">{{t.changelog_badge}}</div>
         <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; gap: 16px; font-size: 13.5px; line-height: 1.6;">
+            <span class="mono" style="color: var(--text-muted); flex-shrink: 0; width: 88px;">{{t.changelog_v7_date}}</span>
+            <span style="color: var(--text-secondary);">{{t.changelog_v7_desc}}</span>
+          </div>
           <div style="display: flex; gap: 16px; font-size: 13.5px; line-height: 1.6;">
             <span class="mono" style="color: var(--text-muted); flex-shrink: 0; width: 88px;">{{t.changelog_v6_date}}</span>
             <span style="color: var(--text-secondary);">{{t.changelog_v6_desc}}</span>
@@ -938,6 +1054,7 @@ const T = {
     nav_arch: "系統架構",
     nav_timeline: "運行機制",
     nav_pricing: "儲存架構",
+    nav_jev: "Jev 重排",
     
     hero_badge: "深色/翡翠綠主題優化 · 基於 UI/UX PRO MAX",
     hero_title: "讓 AI Agent 擁有自我演進的",
@@ -1014,7 +1131,28 @@ const T = {
     dashboard_p2: "知識／經驗／專案／keyword／tag／橋接詞 分色",
     dashboard_p3: "搜尋 · 點擊聚焦鄰域 · 類型開關 · hover 顯示名稱",
 
+    jev_badge: "Optional · Cloud Re-ranker",
+    jev_title: "啟用 Jev 雲端重排",
+    jev_desc: "預設整條檢索都在本機執行，由 bge-reranker 在 CPU 上重排。開啟 TypeSafe Jev 後改由雲端平行評分：10 筆候選約 1.6 秒（本機需載入約 9 秒、推論 10～17 秒）。在 26 個查詢、149 筆盲標的評測中，第 1 名命中率從 0.77 升到 0.85，前 3 名精確率從 0.58 升到 0.67。",
+    jev_s1_title: "設定 API 金鑰",
+    jev_s1_desc: "到 TypeSafe（docs.typesafe.ai）取得 API 金鑰，存成使用者層級環境變數 TYPESAFE_API_KEY，或寫在 ~/.deep-memory/.env。",
+    jev_s1_alt: "或寫進 ~/.deep-memory/.env",
+    jev_s1_note: "環境變數在程式啟動時讀取，設定後要重開終端機與 IDE（VS Code、Claude Code）。金鑰不要放進 config.json 或任何 repo。",
+    jev_s2_title: "在設定檔開啟 Jev",
+    jev_s2_desc: "建立 ~/.deep-memory/config.json，把 provider 設成 jev。jev 底下的欄位都可省略，範例即為預設值。",
+    jev_s2_note: "版本固定為 jev-1.14.0：門檻 0.6 是在這個版本上量出來的，jev-latest 別名可能無預警換版。",
+    jev_s3_title: "確認已生效",
+    jev_s3_desc: "照常執行搜尋。Agent 仍傳 --min-score 0.35，使用 Jev 時程式自動改用 Jev 的門檻 0.6；輸出的 reranker 欄位會標明這次由哪個重排器評分。",
+    jev_s3_expect: "輸出 JSON 應出現",
+    jev_s4_title: "臨時切換與自動退回",
+    jev_s4_desc: "優先順序為 --reranker 參數 > DEEP_MEMORY_RERANKER 環境變數 > config.json。缺金鑰、逾時或 HTTP 錯誤時，該輪自動改用本機 bge，輸出顯示 local (jev fallback: 原因)，搜尋不會中斷。",
+    jev_s4_c1: "單次改用本機",
+    jev_s4_c2: "這個終端機都改用本機",
+    jev_privacy: "開啟後，每次查詢會把查詢字串與每個候選筆記的前 800 字（每輪最多 10 筆）送到 api.typesafe.ai；儲存、向量化與索引仍全在本機。費用約每次查詢 0.0004 美元。記憶內容不能離開本機的環境，請維持預設的本機重排。",
+
     changelog_badge: "更新紀錄",
+    changelog_v7_date: "2026-10-26",
+    changelog_v7_desc: "檢索提速與可選的 Jev 雲端重排：已精煉（reviewed）的冷庫筆記不再索引，向量庫從 7,853 筆精簡為 3,351 筆，清理時零重算。一次同步只讀一次向量庫快照，補索引讀到的語料直接交給查詢複用。重排模型與 E5 在同一次查詢只載入一次，專案輪評過的候選在全庫輪沿用分數。重排文字截斷至 800 字並改為逐筆推論，避免長文把整批短文 pad 到 512。同一台機器、索引已是最新時，查詢從 57.6 秒降到約 29～40 秒。另新增可選的 TypeSafe Jev 雲端重排（設定方式見上方）：同一查詢端到端 22.0 秒、本機 37.7 秒，失敗時自動退回本機。",
     changelog_v6_date: "2026-08-01",
     changelog_v6_desc: "索引改為內容定址：冷庫條目的向量庫 ID 從行號改為語意雜湊，刪改 `raw.jsonl` 中任一行不再讓其後的條目全數重算（實測 928 行的冷庫刪掉正中間一行，重算 0 筆）。增量比對改比 `content_hash` 而非完整組裝文字，調整顯示格式也不再觸發全庫重建。`search.py` 於查詢前自動補索引（失敗只警告、不阻擋查詢），日常不需再手動執行 `update_db.py`。每次索引執行寫入 `logs/index-runs.jsonl`，記錄各階段耗時與重算原因分類（new / text-changed / id-missing），重算比例超過兩成時主動警告。既有索引自動遷移：實測 910 筆 17.5 秒且不重算任何向量，並會回填舊版熱庫條目缺少的雜湊，避免升級時白白重算數百筆未變動的內容。",
     changelog_v5_date: "2026-07-08",
@@ -1040,6 +1178,7 @@ const T = {
     nav_arch: "Architecture",
     nav_timeline: "The Loop",
     nav_pricing: "Storage",
+    nav_jev: "Jev Re-ranker",
     
     hero_badge: "Optimized for Dark/Emerald · Powered by UI/UX PRO MAX",
     hero_title: "Give AI Agent a Self-Evolving",
@@ -1116,7 +1255,28 @@ const T = {
     dashboard_p2: "Colour-coded knowledge / experience / project / keyword / tag / bridge",
     dashboard_p3: "Search · click-to-focus · type toggles · hover labels",
 
+    jev_badge: "Optional · Cloud Re-ranker",
+    jev_title: "Enable the Jev Cloud Re-ranker",
+    jev_desc: "By default the whole retrieval pipeline runs locally, with bge-reranker re-ranking on the CPU. Turn on TypeSafe Jev and candidates are scored in the cloud in parallel: about 1.6 s for 10 candidates, versus ~9 s of model loading plus 10–17 s of inference locally. In a 26-query, 149-label blind evaluation, top-1 precision rose from 0.77 to 0.85 and top-3 precision from 0.58 to 0.67.",
+    jev_s1_title: "Set your API key",
+    jev_s1_desc: "Get an API key from TypeSafe (docs.typesafe.ai) and store it as the user-level environment variable TYPESAFE_API_KEY, or put it in ~/.deep-memory/.env.",
+    jev_s1_alt: "or put it in ~/.deep-memory/.env",
+    jev_s1_note: "Environment variables are read at process start, so reopen your terminal and IDE (VS Code, Claude Code) after setting it. Never put the key in config.json or any repo.",
+    jev_s2_title: "Turn Jev on in the config file",
+    jev_s2_desc: "Create ~/.deep-memory/config.json and set provider to jev. Every field under jev is optional; the example shows the defaults.",
+    jev_s2_note: "The model is pinned to jev-1.14.0: the 0.6 threshold was measured on that version, and the jev-latest alias can move without notice.",
+    jev_s3_title: "Check that it's active",
+    jev_s3_desc: "Search as usual. Agents keep passing --min-score 0.35; with Jev active the script applies Jev's own 0.6 threshold, and the reranker field in the output says which re-ranker scored the results.",
+    jev_s3_expect: "the output JSON should contain",
+    jev_s4_title: "Override and automatic fallback",
+    jev_s4_desc: "Precedence: --reranker flag > DEEP_MEMORY_RERANKER environment variable > config.json. On a missing key, a timeout, or an HTTP error, that pass falls back to local bge and the output shows local (jev fallback: <reason>); search never fails.",
+    jev_s4_c1: "use local for one call",
+    jev_s4_c2: "use local for this shell",
+    jev_privacy: "When enabled, each query sends the query text and the first 800 characters of each candidate note (up to 10 per pass) to api.typesafe.ai; storage, embedding and indexing stay local. It costs about US$0.0004 per query. If your memory must not leave the machine, keep the default local re-ranker.",
+
     changelog_badge: "Changelog",
+    changelog_v7_date: "2026-10-26",
+    changelog_v7_desc: "Faster retrieval and an optional Jev cloud re-ranker. Refined (reviewed) cold notes are no longer indexed, shrinking the vector store from 7,853 to 3,351 entries with zero re-embedding. Each sync reads the vector-store snapshot once, and the corpus it reads is handed straight to the query. The re-ranker and E5 load once per query, and candidates scored in the project pass keep their scores in the fallback pass. Re-ranker input is truncated to 800 characters and scored one pair at a time, so one long entry no longer pads the whole batch to 512 tokens. On the same machine with an up-to-date index, a query went from 57.6 s to about 29–40 s. Also new: an optional TypeSafe Jev cloud re-ranker (setup above) — 22.0 s end to end versus 37.7 s locally on the same query, with automatic fallback to local on any error.",
     changelog_v6_date: "2026-08-01",
     changelog_v6_desc: "Indexing is now content-addressed: cold-store entries are keyed by a semantic hash instead of a line number, so editing or deleting any line in `raw.jsonl` no longer forces every entry below it to be re-embedded (measured: removing the middle line of a 928-line store re-embedded 0 entries). Incremental comparison reads `content_hash` rather than the full assembled text, so changing display formatting no longer triggers a full rebuild. `search.py` tops up the index before querying — failures warn but never block the search — so `update_db.py` is out of the daily loop. Every run appends to `logs/index-runs.jsonl` with per-stage timings and a reason breakdown (new / text-changed / id-missing), warning when more than 20% of the store is re-embedded. Existing indexes migrate automatically: 910 entries in 17.5s with zero re-embedding, and hashes missing from older hot-store entries are backfilled so upgrading doesn't needlessly recompute hundreds of unchanged entries.",
     changelog_v5_date: "2026-07-08",
