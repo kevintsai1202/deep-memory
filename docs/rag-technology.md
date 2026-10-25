@@ -57,7 +57,8 @@ RAG 的檢索對象涵蓋兩層儲存，**全部集中在使用者家目錄的�
 - 每個條目由標題產生穩定、可讀的 slug（`slugify()`，同檔重複標題自動加序號），文件 id 形如 `experience/skill-xxx.md#fps-30-causes-av-desync`。
 - 檔案完全沒有 `## 🔧` 標題時（不符範本的舊檔），退回整檔索引以維持向下相容。
 - 小於 200 bytes 的檔案與 `_index.json` 直接略過。
-- 冷庫每行 JSON 組合成固定格式文字（主題／日期／技能／標籤／內容），id 形如 `cold-notes/raw.jsonl#L12`。
+- 冷庫每行 JSON 組合成固定格式文字（主題／日期／技能／標籤／內容），id 為內容定址的 `cold-notes#<語意雜湊>`（見 §3.5）。
+- **已精煉（`quality: reviewed`）的冷庫條目預設不索引**（`read_cold_notes(include_reviewed=False)`）：精煉過的內容已升格進熱庫，略過而未升格的則已判定不值得保留；再索引一次只會讓原始筆記和熱庫條目搶 Top-K 名額，並讓每次查詢多做數千筆 BM25 分詞。條目一被標為 reviewed，下次同步就會把它的向量當孤立向量刪除（零重算）。行號 `line` 仍是 `raw.jsonl` 的實際行號，不因跳過而位移。
 
 ### 3.2 Metadata 設計
 
@@ -82,7 +83,7 @@ RAG 的檢索對象涵蓋兩層儲存，**全部集中在使用者家目錄的�
 
 ### 3.4 重建時機
 
-`search.py` 在查詢前會呼叫 `indexer.ensure_fresh()` 自動補索引，因此**日常不需要手動執行 `update_db.py`**。索引失敗只印警告、不中斷查詢；`--no-auto-index` 可停用。
+`search.py` 在查詢前會呼叫 `indexer.ensure_fresh()` 自動補索引，因此**日常不需要手動執行 `update_db.py`**。索引失敗只印警告、不中斷查詢；`--no-auto-index` 可停用。補索引時讀到的語料會回傳給 `search.py` 直接複用，不再重讀一次來源檔；一次同步只讀一次 collection 的 metadata 快照（遷移時例外）。
 
 `update_db.py` 為**增量索引**：只對新增或內容雜湊變動的條目重算向量，metadata-only 變動走 `collection.update()` 不重算，零變動的執行約 1-2 秒完成（此時完全不載入模型）。仍值得手動執行的情況只剩兩種：
 
@@ -137,7 +138,12 @@ flowchart LR
 
 - 模型：**`BAAI/bge-reranker-base`**（CrossEncoder，CPU 執行）。
 - 與雙塔式（bi-encoder）向量檢索不同，Cross-Encoder 將「查詢＋文件」成對送入模型逐一評分，精度更高、成本也更高——因此只對融合後的少量候選執行。
-- 依 `rerank_score` 排序、套用 `--min-score`，最終回傳前 `--limit`（預設 4）筆。
+- 送進重排模型的文字截斷至 `--rerank-max-chars`（預設 800 字元，`0` 為不截斷），回傳結果仍是完整原文。中文 800 字元約 350–450 tokens，涵蓋條目標題、情境與核心做法。
+- 逐筆推論、不做 batch padding：候選長短不一時，一篇 512-token 長文會把同批短文全部 pad 到 512。分數與整批推論相同，10 筆候選實測約快一倍。
+- 重排模型在同一次查詢內只載入一次，專案輪與全庫 fallback 輪共用；專案輪已評過分的候選在全庫輪直接沿用分數。E5 模型也在同一行程共用（`onnx_models.get_shared_e5()`），查詢前補索引載入過就不再載第二次。
+- 實測不採用的做法（2026-10-25，Ultra 5 125H）：截斷 400 字（60 筆中 18 筆跨過 0.35 門檻）、reranker int8 動態量化（快約 1.6～2 倍，但分數最大偏移 0.28、3/60 筆跨門檻）、ORT 優化圖快取與背景執行緒載入（收益 0～1.5 秒）、調整 `intra_op_num_threads`（預設最快）。
+- **可選的雲端重排器 TypeSafe Jev**（2026-10-26 起）：每組（查詢、候選）送一題 Noul「這筆筆記能否幫助回答查詢」，10 組平行，每次查詢約 1.6 秒（本機 bge 載入約 9 秒＋推論 10～17 秒）。26 個查詢、149 筆盲標評測：P@1 0.77 → 0.85、P@3 0.58 → 0.67；Jev 門檻 0.6 的精確率／召回率 0.67／0.98，優於 bge 門檻 0.35 的 0.56／0.93。以 `<workspace>/config.json` 的 `reranker.provider` 開啟（`DEEP_MEMORY_RERANKER`、`--reranker` 可覆寫），金鑰讀環境變數 `TYPESAFE_API_KEY` 或 `<workspace>/.env`。用 Jev 時門檻改用 `reranker.jev.min_score`（預設 0.6），`--min-score` 只作用於本機 bge；Jev 任何失敗都整輪退回本機 bge，輸出 `reranker` 欄位標明實際使用的重排器。評測腳本：`scripts/bench/jev_rerank_eval.py`。
+- 依 `rerank_score` 排序、套用門檻，最終回傳前 `--limit`（預設 4）筆。
 - **門檻守則：呼叫時帶 `--min-score 0.35`，讓過濾發生在檢索端**；`results` 為空視為「知識庫查無相關記錄」。檢索端過濾同時是專案優先 fallback（見 4.5）能正常運作的前提。
 
 ### 4.5 專案優先的兩段式檢索
@@ -173,6 +179,7 @@ flowchart LR
 ```json
 {
   "scope": "project:deep-memory",
+  "reranker": "local",
   "results": [
     {
       "path": "experience/skill-remotion-best-practices.md#fps-30-causes-av-desync",
@@ -189,7 +196,7 @@ flowchart LR
 
 1. **檔名優先**：提問明確提到檔名時，直接讀該檔全文，不繞道 RAG。
 2. **分層 RAG**：檔名比對失敗才退到 `search.py` 混合檢索＋重排。
-3. **分數門檻**：`rerank_score ≤ 0.35` 的結果一律不進入模型 context，避免雜訊污染回答品質。
+3. **分數門檻**：`rerank_score ≤ 0.35` 的結果一律不進入模型 context，避免雜訊污染回答品質（用 Jev 重排時門檻為 0.6，由 `search.py` 依輸出的 `reranker` 自動套用）。
 4. **`text` 即上下文**：結果的 `path` 帶 `#entry-slug`，僅供引用出處；**直接使用回傳的 `text`，不要再用 Read 開整份來源檔**——重讀整檔等於推翻條目級切段、把同檔所有無關條目倒回 context。
 5. **冷庫一律走 RAG**：向量化後不再直接讀 `raw.jsonl` 做檢索（唯一例外是精煉流程，它需要全語料的 tags/skill/date 做聚類，非單一查詢的 top-K 模型能涵蓋）。
 
@@ -197,7 +204,9 @@ flowchart LR
 
 ## 6. 地端 RAG 架構（Fully Local RAG）
 
-本系統是**純地端（on-premises / fully local）RAG**：從資料儲存、向量化、索引到檢索重排，整條管線都在使用者本機執行，**不呼叫任何雲端 LLM API 或向量資料庫服務**。
+本系統預設是**純地端（on-premises / fully local）RAG**：從資料儲存、向量化、索引到檢索重排，整條管線都在使用者本機執行，**不呼叫任何雲端 LLM API 或向量資料庫服務**。
+
+唯一例外是使用者明確開啟的雲端重排器 Jev（見 §4.4）：開啟後，每次查詢會把查詢字串與每個候選的前 800 字（每輪最多 10 筆）送到 `api.typesafe.ai`。儲存、向量化、索引仍全在本機；Jev 失敗或離線時自動退回本機 bge，檢索不中斷。資料不得離開本機的環境不要開啟。
 
 ### 6.1 全離線的組成
 
@@ -206,12 +215,12 @@ flowchart LR
 | 資料儲存 | 雲端向量服務（Pinecone、Weaviate Cloud 等） | ChromaDB `PersistentClient` 落地本機 `~/.deep-memory/chroma_hybrid_db/` |
 | Embedding | 呼叫 OpenAI / Voyage 等 embedding API | `intfloat/multilingual-e5-small` 於本機 CPU 推論 |
 | 關鍵字檢索 | 託管搜尋服務（Elasticsearch Cloud 等） | `rank_bm25` 在查詢當下於記憶體內即時建立語料 |
-| 重排 | 雲端 rerank API（Cohere Rerank 等） | `BAAI/bge-reranker-base` 於本機 CPU 推論 |
+| 重排 | 雲端 rerank API（Cohere Rerank 等） | `BAAI/bge-reranker-base` 於本機 CPU 推論（可選開啟 TypeSafe Jev 雲端重排） |
 | 知識來源 | 外部文件庫、網路爬取 | 本機 `knowledge-base/`、`experience/`、`cold-notes/`（皆為使用者自己的記憶資料） |
 
 ### 6.2 為什麼選擇地端
 
-1. **資料隱私**：知識庫與冷庫記錄的是使用者的工作記憶（含專案細節、程式碼片段、除錯過程），全程不離開本機，無資料外流疑慮，適合企業內網或涉及機敏資訊的環境。
+1. **資料隱私**：知識庫與冷庫記錄的是使用者的工作記憶（含專案細節、程式碼片段、除錯過程），未開啟 Jev 雲端重排時全程不離開本機，無資料外流疑慮，適合企業內網或涉及機敏資訊的環境。
 2. **零邊際成本**：檢索與向量化不產生任何 API 費用；每回合寫冷庫、頻繁查詢都沒有成本壓力。
 3. **離線可用**：模型下載完成後，斷網環境下 RAG 功能完全正常。
 4. **延遲可控**：無網路往返，查詢延遲只取決於本機 CPU；小型模型（e5-small 約 118M 參數、bge-reranker-base 約 278M 參數）在一般筆電 CPU 上即可於秒級完成。
@@ -227,7 +236,7 @@ flowchart LR
 
 | 面向 | 地端（本系統） | 雲端 RAG |
 |---|---|---|
-| 隱私 | ✅ 資料不出本機 | ❌ 需信任第三方服務 |
+| 隱私 | ✅ 資料不出本機（開啟 Jev 重排時，查詢與候選前 800 字會送出） | ❌ 需信任第三方服務 |
 | 成本 | ✅ 零 API 費用 | ❌ 依查詢量／儲存量計費 |
 | 檢索品質 | ⚠️ 小型模型，靠混合檢索＋重排補足 | ✅ 可用大型 embedding／rerank 模型 |
 | 擴充性 | ⚠️ 單機規模（個人記憶庫綽綽有餘） | ✅ 可擴展至海量文件 |

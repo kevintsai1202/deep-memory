@@ -91,7 +91,13 @@ Whenever a non-deep-memory skill is used this turn:
 - If the `skill-id` is already in `loaded_experience_skills`, **skip re-reading and re-notifying**.
 - Otherwise, execute:
   1. Read `experience/_index.json`
-  2. If the `skill-id` is found, load `experience/skill-[skill-id].md`
+  2. If the `skill-id` is found, check the size of `experience/skill-[skill-id].md`:
+     - **< 50 KB** → load the whole file
+     - **≥ 50 KB** → do not read the whole file (it dilutes the context window; some experience files exceed 400 KB). Retrieve only the most relevant entries instead, and use the returned `text` as-is:
+       ```bash
+       <PY> skills/chroma-hybrid-search/scripts/search.py --query "core question or task of this turn" --skill [skill-id] --memory-type experience --limit 3 --min-score 0.35
+       ```
+       If the command fails (e.g. no venv yet), fall back to reading only the first ~50 KB of the file.
   3. Add the `skill-id` to `loaded_experience_skills`
   4. Include in the reply: `Experience loaded: skill-xxx.md`
   5. If not found in the index, add to `missing_experience_skills`
@@ -125,7 +131,7 @@ Execute the following only on the first turn of a conversation or when a topic s
 - `search.py` covers both hot and cold store content — once the cold store is vectorized, don't also read `cold-notes/raw.jsonl` directly for retrieval; that's reserved for the refinement workflow in `resources/cold-store-and-vectorization.md`, which needs full-corpus access, not single-query retrieval
 - **Storage is a single global store under `~/.deep-memory`, not per-project.** All projects write to and read from the same home-directory cold/hot store, regardless of which project's directory the command runs from.
 - **Project scoping**: cold store entries carry a `project` field (auto-filled by `write_cold.py` from the calling directory's name). `search.py` uses this to search the current project first, and only falls back to the full cross-project store if that yields no results — this keeps unrelated projects' notes from crowding out relevant ones by default, while still finding cross-project knowledge (e.g. general git/deploy patterns) when nothing project-specific matches. Entries written before this scoping was added have no `project` field and are only reachable via the fallback pass. Passing `--min-score 0.35` (as in the command above) is what keeps this fallback working: the fallback only fires when the project pass returns nothing, so without the search-side filter a single irrelevant project entry with a near-zero score would occupy the result set and block the cross-project search.
-- The returned JSON is now `{"scope": "...", "results": [...]}` — `scope` tells you whether the hit came from the current project or the cross-project fallback; read `results` for the actual entries.
+- The returned JSON is now `{"scope": "...", "reranker": "...", "results": [...]}` — `scope` tells you whether the hit came from the current project or the cross-project fallback; `reranker` says which re-ranker scored the results (`local`, `jev`, or `local (jev fallback: ...)`; the optional Jev re-ranker is configured in `<workspace>/config.json`, see chroma-hybrid-search); read `results` for the actual entries. Keep passing `--min-score 0.35` either way — with Jev active the script applies Jev's own threshold.
 - `knowledge-base/*.md` and `experience/*.md` hits are indexed per `## 🔧` entry, so `path` looks like `file.md#entry-slug` — **use the returned `text` as-is; do not separately open `path` with the Read tool.** Re-reading the whole source file defeats the entry-level chunking and dumps every unrelated entry in that file back into context.
 - With `--min-score 0.35`, everything in `results` already passed the relevance threshold search-side — read each entry's `text` as context
 - If `results` is empty (nothing anywhere scored above 0.35):

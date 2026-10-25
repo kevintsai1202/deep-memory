@@ -156,8 +156,15 @@ def hot_entry_hash(text):
     return hashlib.sha1(text.encode("utf-8")).hexdigest()[:12]
 
 
-def read_cold_notes(base_dir):
-    """讀取冷庫（cold-notes/raw.jsonl）中的所有條目，轉換為可索引格式"""
+def read_cold_notes(base_dir, include_reviewed=False):
+    """讀取冷庫（cold-notes/raw.jsonl）中的條目，轉換為可索引格式。
+
+    預設（include_reviewed=False）只讀尚未精煉（quality != 'reviewed'）的條目：
+    已精煉的內容已升格進熱庫，再索引一次只會讓原始筆記和熱庫條目搶 Top-K 名額，
+    也讓每次查詢多做數千筆無謂的 BM25 分詞。include_reviewed=True 保留讀取全量
+    歷史的能力（例如 v1 遷移需要以全部舊文字配對向量）。
+    行號（line）一律是 raw.jsonl 的實際行號，不因跳過 reviewed 行而位移。
+    """
     jsonl_path = os.path.join(base_dir, "cold-notes", "raw.jsonl")
     if not os.path.exists(jsonl_path):
         return []
@@ -170,6 +177,9 @@ def read_cold_notes(base_dir):
                 continue
             try:
                 entry = json.loads(line)
+                # 已精煉升格至熱庫的冷庫筆記預設不再索引
+                if not include_reviewed and entry.get("quality") == "reviewed":
+                    continue
                 tags_str = ", ".join(entry.get("tags", []))
                 memory_type = infer_memory_type(entry)
                 text = (

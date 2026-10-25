@@ -22,30 +22,37 @@ LEGACY_COLD_PREFIX = "cold-notes/raw.jsonl#L"
 COLD_ID_PREFIX = "cold-notes"
 
 
-def detect_schema(collection):
+def detect_schema(collection, existing=None):
     """判斷向量庫的 schema 版本，決定要不要遷移。
 
     以「是否存在行號式 ID」與「metadata 的 schema_version」兩個訊號綜合判定，
     並取最舊的版本——遷移中斷造成的混合狀態必須被判為需要遷移，
     不能因為抽樣抽到已遷移的那筆就放過。
+    existing 為 sync() 預先取得的 collection.get(include=["metadatas"]) 快照，
+    未傳入時才自行讀取；數千筆規模下每次讀取約 2 秒，不該重複付。
     """
-    ids = collection.get(include=[])["ids"]
+    if existing is None:
+        existing = collection.get(include=["metadatas"])
+    ids = existing["ids"]
     if not ids:
         return SCHEMA_VERSION
     if any(i.startswith(LEGACY_COLD_PREFIX) for i in ids):
         return 1
-    metas = collection.get(include=["metadatas"])["metadatas"]
+    metas = existing["metadatas"]
     versions = {(m or {}).get("schema_version", 1) for m in metas}
     return min(versions) if versions else SCHEMA_VERSION
 
 
-def assert_schema_supported(collection):
+def assert_schema_supported(collection, existing=None):
     """庫的 schema 版本高於本腳本時中止執行。
 
     舊腳本寫進新格式的庫會產生無法自動修復的混合狀態——
     寧可明確擋下並要求升級 skill，也不要留下一個壞掉的索引。
+    existing 同 detect_schema：可傳入預取快照以免重複讀取。
     """
-    metas = collection.get(include=["metadatas"])["metadatas"]
+    if existing is None:
+        existing = collection.get(include=["metadatas"])
+    metas = existing["metadatas"]
     versions = {(m or {}).get("schema_version", 1) for m in metas}
     if versions and max(versions) > SCHEMA_VERSION:
         raise RuntimeError(
@@ -259,13 +266,15 @@ def backfill_hot_entries(collection):
     return len(fix_ids)
 
 
-def build_plan(collection, docs):
+def build_plan(collection, docs, existing=None):
     """比對來源文件與向量庫現況，產出增量計畫。
 
     只讀 metadatas 不讀 documents：比對鍵是 content_hash，
     毋須把整個知識庫的全文（數十 MB）搬進記憶體。
+    existing 同 detect_schema：可傳入預取快照以免重複讀取。
     """
-    existing = collection.get(include=["metadatas"])
+    if existing is None:
+        existing = collection.get(include=["metadatas"])
     existing_metas = dict(zip(existing["ids"], existing["metadatas"]))
 
     plan = IndexPlan()
@@ -359,7 +368,7 @@ def format_anomaly_warning(plan, total):
     return "\n".join(lines)
 
 
-def sync(base_dir, trigger="update_db", rebuild=False, verbose=True):
+def sync(base_dir, trigger="update_db", rebuild=False, verbose=True, return_docs=False):
     """執行一次完整的索引同步，回傳統計結果。
 
     trigger 記錄呼叫來源（update_db / search-auto），寫進日誌以便區分
@@ -369,6 +378,13 @@ def sync(base_dir, trigger="update_db", rebuild=False, verbose=True):
     回傳 dict 的 backfilled 欄位記錄本次 backfill_hot_entries 實際回填的
     熱庫筆數：這跟 reasons 一樣是診斷訊號，寫進 index-runs.jsonl 才能在
     事後追溯「這次遷移到底補了多少筆」，不必只靠 console 輸出。
+
+    return_docs=True 時回傳 (result, docs)，讓 search.py 直接複用這次讀到的
+    語料，不必再讀一次全部 MD 與 raw.jsonl。
+
+    collection.get(include=["metadatas"]) 整個流程只讀一次快照（遷移時例外，
+    遷移改了 ID 與 metadata，完成後要重讀），由 assert_schema_supported、
+    detect_schema、build_plan 與筆數統計共用。
     """
     import time
     import chromadb
@@ -388,7 +404,10 @@ def sync(base_dir, trigger="update_db", rebuild=False, verbose=True):
 
     client = chromadb.PersistentClient(path=db_path)
     collection = client.get_or_create_collection("hybrid_docs")
-    assert_schema_supported(collection)
+    t = time.time()
+    # 本次同步共用的庫內快照（ids + metadatas）
+    existing = collection.get(include=["metadatas"])
+    assert_schema_supported(collection, existing=existing)
 
     # 這個 if 底下做兩件事：migrate_to_v2 把冷庫的行號式 ID 換成內容定址；
     # backfill_hot_entries 用 collection.update() 補上熱庫條目缺少的
@@ -409,17 +428,23 @@ def sync(base_dir, trigger="update_db", rebuild=False, verbose=True):
     # schema_version 皆為 SCHEMA_VERSION 後，detect_schema 才會回報
     # 最新版本，本區塊屆時就不會再被進入。
     backfilled = 0
-    if detect_schema(collection) < SCHEMA_VERSION:
-        t = time.time()
-        collection = migrate_to_v2(collection, db_path, cold_docs)
+    if detect_schema(collection, existing=existing) < SCHEMA_VERSION:
+        t_mig = time.time()
+        # 遷移要用含 reviewed 的全量冷庫配對舊向量：read_cold_notes 預設略過
+        # reviewed，精煉過的舊庫 reviewed 常佔九成，只拿過濾後的清單配對會
+        # 跌破五成門檻而中止。配上的 reviewed 向量隨後由 build_plan 當孤立向量清掉。
+        all_cold = read_cold_notes(base_dir, include_reviewed=True)
+        collection = migrate_to_v2(collection, db_path, all_cold)
         backfilled = backfill_hot_entries(collection)
-        timing["migrate"] = round(time.time() - t, 2)
+        timing["migrate"] = round(time.time() - t_mig, 2)
+        # 遷移改變了庫內 ID 與 metadata，重新取一次快照
+        t = time.time()
+        existing = collection.get(include=["metadatas"])
 
-    t = time.time()
-    plan = build_plan(collection, docs)
+    plan = build_plan(collection, docs, existing=existing)
     timing["get"] = round(time.time() - t, 2)
 
-    total_existing = len(collection.get(include=[])["ids"])
+    total_existing = len(existing["ids"])
 
     if rebuild:
         # 強制全量：把所有條目都放進待重算清單
@@ -434,7 +459,9 @@ def sync(base_dir, trigger="update_db", rebuild=False, verbose=True):
         print(warning)
 
     if plan.stale_ids:
-        collection.delete(ids=plan.stale_ids)
+        # 分批刪除：首次啟用 reviewed 過濾時會一次清掉數千筆，可能超過 chromadb 單批上限
+        for s in range(0, len(plan.stale_ids), 500):
+            collection.delete(ids=plan.stale_ids[s:s+500])
         if verbose:
             print(f"[清理] 移除 {len(plan.stale_ids)} 筆孤立向量（來源已刪除或改名）")
 
@@ -443,8 +470,9 @@ def sync(base_dir, trigger="update_db", rebuild=False, verbose=True):
     if plan.embed_ids:
         # 到這裡才載入模型：零變動或 metadata-only 的執行完全不付模型載入成本
         t = time.time()
-        from onnx_models import E5OnnxEmbeddingFunction
-        ef = E5OnnxEmbeddingFunction()
+        # 取同行程共用實例：由 search.py 觸發時，查詢向量接著沿用同一個模型
+        import onnx_models
+        ef = onnx_models.get_shared_e5()
         timing["model_load"] = round(time.time() - t, 2)
 
         t = time.time()
@@ -477,17 +505,19 @@ def sync(base_dir, trigger="update_db", rebuild=False, verbose=True):
         print(f"[增量] 重算 {result['embedded']} 筆、僅更新 metadata "
               f"{result['meta_only']} 筆、未變跳過 {result['skipped']} 筆"
               f"（耗時 {timing['total']}s）")
-    return result
+    return (result, docs) if return_docs else result
 
 
-def ensure_fresh(base_dir, verbose=False):
+def ensure_fresh(base_dir, verbose=False, return_docs=False):
     """供 search.py 於查詢前呼叫的自動補索引。
 
     索引是為了服務檢索，不該反過來讓檢索失效——任何失敗都只印警告後放行，
     使用者最多少撈到最新幾筆，而不是整個搜尋不能用。
+    return_docs=True 時回傳 (result, docs) 供呼叫端複用已讀取的語料；
+    失敗時回傳 (None, None)，呼叫端見 docs 為 None 就自行讀檔。
     """
     try:
-        return sync(base_dir, trigger="search-auto", verbose=verbose)
+        return sync(base_dir, trigger="search-auto", verbose=verbose, return_docs=return_docs)
     except Exception as exc:
         print(f"[WARN] 自動補索引失敗，改用現有索引繼續查詢：{exc}")
-        return None
+        return (None, None) if return_docs else None

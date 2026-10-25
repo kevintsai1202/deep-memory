@@ -119,12 +119,86 @@ class TestSuggestTarget(unittest.TestCase):
         self.assertEqual(rp.suggest_target(_note(1, "t"), strong, {}), "knowledge-base/taidoc-helpdesk-auth.md")
         self.assertEqual(rp.suggest_target(_note(1, "t"), weak, {}), rp.UNKNOWN_TARGET)
 
+    def test_jev_score_uses_jev_threshold(self):
+        # Jev 分數尺度與 bge 不同：評測得出的對應門檻是 0.6，不能沿用 bge 的 0.5
+        strong = [{"path": "knowledge-base/taidoc-helpdesk-auth.md#a", "score": 0.65, "kind": "jev"}]
+        weak = [{"path": "knowledge-base/taidoc-helpdesk-auth.md#a", "score": 0.55, "kind": "jev"}]
+        self.assertEqual(rp.suggest_target(_note(1, "t"), strong, {}), "knowledge-base/taidoc-helpdesk-auth.md")
+        self.assertEqual(rp.suggest_target(_note(1, "t"), weak, {}), rp.UNKNOWN_TARGET)
+
     def test_distance_to_similarity(self):
         self.assertAlmostEqual(rp.distance_to_similarity(0.14), 0.93)
         self.assertAlmostEqual(rp.distance_to_similarity(0.0), 1.0)
 
     def test_unknown_when_nothing_matches(self):
         self.assertEqual(rp.suggest_target(_note(1, "zzz"), [], {}), "(新分類？)")
+
+
+class TestRerankerChoice(unittest.TestCase):
+    """--rerank 依 <workspace>/config.json 選 Jev 或本機 bge；Jev 失敗改用本機且不再嘗試"""
+
+    def setUp(self):
+        import os
+        import sys
+        sys.path.insert(0, str(rp._search_scripts_dir()))
+        import jev_reranker
+        self.jev_reranker = jev_reranker
+        # 避免開發者本機的重排設定與金鑰滲進測試
+        from unittest import mock
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("DEEP_MEMORY_RERANKER", "TYPESAFE_API_KEY", "JEV_API_KEY")}
+        patcher = mock.patch.dict(os.environ, env, clear=True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _ws(self, provider, key=None):
+        d = Path(tempfile.mkdtemp())
+        (d / "config.json").write_text(json.dumps({"reranker": {"provider": provider}}), encoding="utf-8")
+        if key:
+            (d / ".env").write_text(f"TYPESAFE_API_KEY={key}\n", encoding="utf-8")
+        return d
+
+    class _FakeLocal:
+        def predict(self, pairs):
+            return [0.3 for _ in pairs]
+
+    def test_local_by_default(self):
+        choice = rp.RerankerChoice(self._ws("local"))
+        choice._local_factory = self._FakeLocal
+        scores, kind = choice.score("q", ["甲", "乙"])
+        self.assertEqual((scores, kind), ([0.3, 0.3], "rerank"))
+
+    def test_jev_when_configured(self):
+        from unittest import mock
+        choice = rp.RerankerChoice(self._ws("jev", key="k"))
+        with mock.patch.object(self.jev_reranker.JevReranker, "predict", return_value=[0.9, 0.1]) as m:
+            scores, kind = choice.score("q", ["甲", "乙"])
+        self.assertEqual((scores, kind), ([0.9, 0.1], "jev"))
+        # Jev 用評測時的 800 字截斷，不是 bge 的 400
+        self.assertEqual(m.call_args.args[0], [["q", "甲"], ["q", "乙"]])
+
+    def test_jev_failure_falls_back_and_stays_local(self):
+        import contextlib
+        import io
+        from unittest import mock
+        choice = rp.RerankerChoice(self._ws("jev", key="k"))
+        choice._local_factory = self._FakeLocal
+        with mock.patch.object(self.jev_reranker.JevReranker, "predict",
+                               side_effect=self.jev_reranker.JevError("timeout")) as m, \
+                contextlib.redirect_stderr(io.StringIO()):
+            first = choice.score("q", ["甲"])
+            second = choice.score("q", ["乙"])
+        self.assertEqual(first, ([0.3], "rerank"))
+        self.assertEqual(second, ([0.3], "rerank"))
+        self.assertEqual(m.call_count, 1, "Jev 失敗後不應再嘗試")
+
+    def test_jev_without_key_uses_local(self):
+        import contextlib
+        import io
+        with contextlib.redirect_stderr(io.StringIO()):
+            choice = rp.RerankerChoice(self._ws("jev"))
+        choice._local_factory = self._FakeLocal
+        self.assertEqual(choice.score("q", ["甲"])[1], "rerank")
 
 
 class TestWriteWorkdir(unittest.TestCase):

@@ -34,6 +34,9 @@ STRONG_CANDIDATE_SCORE = 0.5
 STRONG_VECTOR_SIMILARITY = 0.89
 # 重排時文件只取前 N 字：全文重排每對約 0.5~1 秒，截斷後排名前段幾乎不變
 RERANK_TEXT_CHARS = 400
+# 改用 Jev 雲端重排時的強相關門檻與截斷字數：與 search.py 相同，取自 2026-10-25 的 149 筆盲標評測
+STRONG_JEV_SCORE = 0.6
+JEV_TEXT_CHARS = 800
 # 無法判定目標時的標記
 UNKNOWN_TARGET = "(新分類？)"
 # 無主題時的標記
@@ -204,8 +207,9 @@ def distance_to_similarity(distance):
 
 
 def _is_strong(candidate):
-    """依分數種類（vector 相似度或 rerank 分數）套用對應門檻。"""
-    threshold = STRONG_VECTOR_SIMILARITY if candidate.get("kind") == "vector" else STRONG_CANDIDATE_SCORE
+    """依分數種類（vector 相似度、本機 rerank 分數或 Jev 分數）套用對應門檻。"""
+    kind = candidate.get("kind")
+    threshold = {"vector": STRONG_VECTOR_SIMILARITY, "jev": STRONG_JEV_SCORE}.get(kind, STRONG_CANDIDATE_SCORE)
     return (candidate.get("score") or 0) >= threshold
 
 
@@ -289,6 +293,45 @@ def _search_scripts_dir():
     return here.parent.parent / "chroma-hybrid-search" / "scripts"
 
 
+class RerankerChoice:
+    """--rerank 用的重排器：依 <workspace>/config.json（與 search.py 同一份設定）選 Jev 或本機 bge。
+
+    Jev 缺金鑰或任何一次評分失敗，就印 stderr 警告並改用本機，之後不再嘗試——
+    精煉一次要評上百筆，不能每筆都再付一次逾時成本。
+    """
+
+    def __init__(self, workspace):
+        sys.path.insert(0, str(_search_scripts_dir()))
+        from jev_reranker import JevReranker, load_reranker_config
+        cfg = load_reranker_config(str(workspace))
+        self.jev = None      # Jev 重排器；None 代表用本機
+        self.local = None    # 本機 bge，第一次需要時才載入（約 1.1 GB）
+        self._local_factory = None  # 測試可注入替身，避免載入真模型
+        if cfg["provider"] == "jev":
+            jc = cfg["jev"]
+            if jc.get("api_key"):
+                self.jev = JevReranker(api_key=jc["api_key"], model=jc["model"],
+                                       timeout=jc["timeout"], concurrency=jc["concurrency"])
+            else:
+                print("[WARN] 設定為 Jev 重排但找不到 TYPESAFE_API_KEY，改用本機 bge-reranker", file=sys.stderr)
+
+    def score(self, query, texts):
+        """替一組候選文字評分，回傳 (分數列表, 分數種類 "jev" 或 "rerank")"""
+        if self.jev is not None:
+            try:
+                return [float(s) for s in self.jev.predict([[query, t[:JEV_TEXT_CHARS]] for t in texts])], "jev"
+            except Exception as exc:
+                print(f"[WARN] Jev 重排失敗（{exc}），改用本機 bge-reranker", file=sys.stderr)
+                self.jev = None
+        if self.local is None:
+            if self._local_factory is None:
+                from onnx_models import OnnxReranker
+                self._local_factory = OnnxReranker
+            self.local = self._local_factory()
+        scores = self.local.predict([[query, t[:RERANK_TEXT_CHARS]] for t in texts])
+        return [float(s) for s in scores], "rerank"
+
+
 def find_candidates(workspace, notes, top_k=3, candidate_limit=10, rerank=False):
     """以混合檢索替每筆找熱庫候選；模型與 BM25 只建一次。回傳 {行號: [{path, score, kind, snippet}]}。
 
@@ -301,7 +344,7 @@ def find_candidates(workspace, notes, top_k=3, candidate_limit=10, rerank=False)
     import indexer
     import kb_reader
     import search
-    from onnx_models import E5OnnxEmbeddingFunction
+    from onnx_models import get_shared_e5
 
     indexer.ensure_fresh(str(workspace))
     hot = kb_reader.read_knowledge_base(str(workspace))
@@ -313,11 +356,10 @@ def find_candidates(workspace, notes, top_k=3, candidate_limit=10, rerank=False)
     collection = chromadb.PersistentClient(path=str(Path(workspace) / "chroma_hybrid_db")) \
         .get_or_create_collection("hybrid_docs")
     queries = [f"{n.get('topic', '')}\n{(n.get('content') or '')[:500]}" for n in notes]
-    embeddings = E5OnnxEmbeddingFunction()(queries)
-    reranker = None
-    if rerank:
-        from onnx_models import OnnxReranker
-        reranker = OnnxReranker()
+    # 與 ensure_fresh 補索引共用同一個 E5 實例，有待補條目時不必再載入一次
+    embeddings = get_shared_e5()(queries)
+    # 依 config.json 選 Jev 或本機 bge（與 search.py 同一份設定）
+    reranker = RerankerChoice(workspace) if rerank else None
     result = {}
     for note, query, emb in zip(notes, queries, embeddings):
         vec = collection.query(query_embeddings=[emb], n_results=min(candidate_limit, len(hot)),
@@ -335,9 +377,9 @@ def find_candidates(workspace, notes, top_k=3, candidate_limit=10, rerank=False)
             continue
         if reranker is not None:
             pool = fused[:5]
-            rr = reranker.predict([[query, doc_map[p]["text"][:RERANK_TEXT_CHARS]] for p in pool])
+            rr, kind = reranker.score(query, [doc_map[p]["text"] for p in pool])
             ranked = sorted(zip(pool, rr), key=lambda x: x[1], reverse=True)[:top_k]
-            picked = [{"path": p, "score": float(sc), "kind": "rerank"} for p, sc in ranked]
+            picked = [{"path": p, "score": float(sc), "kind": kind} for p, sc in ranked]
         else:
             picked = [{"path": p, "score": similarity.get(p), "kind": "vector"} for p in fused[:top_k]]
         for c in picked:
@@ -356,7 +398,7 @@ def main():
     parser.add_argument("--max-pack", type=int, default=25, help="每個工作包最多筆數")
     parser.add_argument("--top-k", type=int, default=3, help="每筆列出的熱庫候選數")
     parser.add_argument("--no-candidates", action="store_true", help="不做檢索（不需虛擬環境）")
-    parser.add_argument("--rerank", action="store_true", help="候選再經重排模型排序（較準但每筆多 2~3 秒）")
+    parser.add_argument("--rerank", action="store_true", help="候選再經重排模型排序（較準但每筆多 2~3 秒；config.json 設 Jev 時改用 Jev）")
     parser.add_argument("--run-id", default=None, help="工作目錄名稱，預設為時間戳")
     args = parser.parse_args()
 

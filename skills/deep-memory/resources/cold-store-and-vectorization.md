@@ -67,7 +67,7 @@
 Cold-store entries are keyed by a semantic hash (`cold-notes#<hash12>`) covering `topic` / `content` / `tags` / `skill` / `memory_type` — **not** by line number, and deliberately **excluding** `date` / `time` / `project` / `quality` and every template string. Consequences worth knowing:
 
 - Deleting or inserting a line anywhere in `raw.jsonl` does **not** re-embed the entries after it. Measured on a 928-line store: removing the middle line re-embedded **0** entries — the 463 entries below it only had their `line` metadata refreshed, at zero embedding cost.
-- Marking an entry `quality: reviewed` during refinement does **not** trigger a re-embed, because `quality` is outside the hash.
+- Marking an entry `quality: reviewed` during refinement does **not** trigger a re-embed, because `quality` is outside the hash. It does drop the entry from search: `reviewed` cold notes are excluded from the index by default (refined ones already live in the hot store; skipped ones were judged not worth keeping), and the next sync deletes their vectors at zero embedding cost.
 - Changing how the indexed text is assembled does **not** invalidate the whole store.
 
 The line number survives as `line` in metadata and is returned with every cold-store search hit, so results stay traceable to their source line.
@@ -116,7 +116,9 @@ the time went into tool round-trips, output drafting, and judging skips one by o
    Output: `<workspace>/refine-work/<run-id>/pack-NN.md` + `manifest.json` (every pending line with a content hash).
    Candidates are ranked by vector + BM25 fusion and scored by vector similarity (fast: ~1 minute of model loading plus
    well under a second per entry). `--rerank` re-orders the top 5 with the cross-encoder (truncated text) for sharper
-   ranking at ~2–3 s per entry — full-text reranking measured 1–2 s per pair and is deliberately not used.
+   ranking at ~2–3 s per entry — full-text reranking measured 1–2 s per pair and is deliberately not used. When
+   `<workspace>/config.json` selects the Jev re-ranker (see chroma-hybrid-search), `--rerank` uses Jev instead (first
+   800 chars, strong-match threshold 0.6) and falls back to the local cross-encoder on a missing key or any error.
    Without the venv, add `--no-candidates` (standard library only; no duplicate-candidate lookup).
 2. **Draft in parallel** — dispatch one subagent per pack **at the same time**. Each reads only its own `pack-NN.md`
    (the draft format contract is at the top of every pack) and writes `pack-NN.drafts.md` next to it:
